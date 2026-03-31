@@ -1,0 +1,12 @@
+# 敏感信息
+config.json
+*.token
+*.secret
+.env
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
