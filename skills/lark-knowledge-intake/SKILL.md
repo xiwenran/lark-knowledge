@@ -39,10 +39,12 @@ lark-cli docs +fetch --doc "<url_or_token>" --format markdown
 ```
 ① Jina AI Reader：WebFetch https://r.jina.ai/<原始URL>
       ↓ 失败（返回验证页/空内容）
-② Chrome MCP：用 mcp__Claude_in_Chrome__navigate 打开原始URL，
-   再用 mcp__Claude_in_Chrome__get_page_text 读取正文
-      ↓ 失败（仍为验证页）
-③ 提示用户：
+② Sogou 微信搜索：WebFetch https://weixin.sogou.com/weixin?type=2&query=<文章标题关键词>
+   找到对应文章后读取 Sogou 缓存页内容
+      ↓ 未收录或内容不完整
+③ 去掉追踪参数重试：取 URL 中 ? 之前的部分，WebFetch 直接访问
+      ↓ 仍失败
+④ 提示用户：
    "微信文章无法自动读取，请选择：
     A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
     B. 复制全文粘贴过来"
