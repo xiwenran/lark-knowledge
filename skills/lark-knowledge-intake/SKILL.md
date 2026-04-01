@@ -34,22 +34,14 @@ lark-cli docs +fetch --doc "<url_or_token>" --format markdown
 
 **纯文本**：直接处理。
 
-**微信公众号文章**（`mp.weixin.qq.com`）— 自动降级链：
+**微信公众号文章**（`mp.weixin.qq.com`）：
 
-```
-① Jina AI Reader：WebFetch https://r.jina.ai/<原始URL>
-      ↓ 失败（返回验证页/空内容）
-② Sogou 微信搜索：WebFetch https://weixin.sogou.com/weixin?type=2&query=<文章标题关键词>
-   找到对应文章后读取 Sogou 缓存页内容
-      ↓ 未收录或内容不完整
-③ 去掉追踪参数重试：取 URL 中 ? 之前的部分，WebFetch 直接访问
-      ↓ 仍失败
-④ 提示用户：
-   "微信文章无法自动读取，请选择：
-    A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
-    B. 复制全文粘贴过来"
-   → 用户提供 PDF 后用 PDF Skill 识别；提供文本后直接处理
-```
+直接提示用户：
+> "微信文章无法自动读取，请选择：
+> A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
+> B. 复制全文粘贴过来"
+
+用户提供 PDF 后用 PDF Skill 识别；提供文本后直接处理。
 
 **其他网页 URL**：使用 WebFetch 工具。
 
