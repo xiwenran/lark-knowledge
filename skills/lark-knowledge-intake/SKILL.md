@@ -93,104 +93,14 @@ lark-cli base +record-upsert \
 自动升级链触发：评分 ≥ 4 → 开始自动升级流程
 ```
 
-#### Step 4a: 筛选目标记录
-
-```bash
-lark-cli base +record-list \
-  --base-token "<config.base.base_token>" \
-  --table-id "<config.base.table_id>"
-```
-
-筛选本条记录（专题归属 + 资产形态匹配）。
-
-#### Step 4b: 创建知识库页面
-
-**案例包**：创建主成品页 + 视角提炼页
-
-```bash
-# 创建主成品页（主专题/05_案例包/）
-lark-cli docs +create \
-  --title "<标题>" \
-  --wiki-node "<config wiki_directories[主专题][05_案例包]>" \
-  --markdown "<完整案例内容>"
-
-# 在辅助专题/05_案例包/创建视角提炼页
-lark-cli docs +create \
-  --title "<标题>（<辅助专题>视角）" \
-  --wiki-node "<config wiki_directories[辅助专题][05_案例包]>" \
-  --markdown "<该专题视角提炼内容>"
-```
-
-**非案例包**：直接写入对应目录页（方法论/SOP/模板/技巧集）
-
-#### Step 4c: 追加关联区块 + 目录索引
-
-- 主成品页底部追加「来源与关联」链接区块（**必须含可跳转链接**，不可只有纯文本路径）：
-  - 原始文档链接
-  - 主专题成品页链接（如有辅助专题，该行也要有链接）
-  - 辅助专题视角提炼页链接（每个辅助专题一行，都必须是真实可跳转URL）
-  - 收录时间 + 处理状态
-- 主、辅专题目录页各追加一条索引入口
-
-#### Step 4d: 回填多维表格
-
-```bash
-lark-cli base +record-upsert \
-  --base-token "<config.base.base_token>" \
-  --table-id "<config.base.table_id>" \
-  --record-id "<入库返回的record_id>" \
-  --json '{
-    "处理状态": "已升级",
-    "知识库页面链接": "<主成品页URL>",
-    "升级状态": "已完成"
-  }'
-```
-
-#### Step 4e: 自动排版美化（关键步骤，必须执行）
-
-入库 + 升级完成后，对每个新建页面**必须**执行完整排版流程：
-
-**第一步：读取页面原始内容**
-```bash
-lark-cli docs +fetch --doc "<wiki_token>" --format markdown
-```
-
-**第二步：生成彩色增强版内容（严格按 lark-knowledge-format v6.4 规则）**
-- 标题格式：**必须用 `<text color="...">一、标题</text>` 包裹**，禁止 `{color="..."}` 属性
-- 文字颜色：`<text color="...">内容</text>` 闭合标签不许漏
-- 背景高亮：`<text background-color="...">内容</text>` 组合使用
-- 颜色密度：**每段 2-4 个着色词，每屏 3-5 处红色**，宁可过<minimax:tool_call>欠
-- 红色用途：数字/时间节点/动作词/强调效果 全部用红
-- 禁止：`<span style>` / 嵌套 `<text>` / 列表（→ Callout）
-- Callout 5类固定：💡核心结论→light-yellow、✅重要动作→light-green、📌结构→light-blue、⚠️注意→light-orange、❌误区→light-red
-- 参考效果：https://www.feishu.cn/wiki/STMFws3lIiSmWMktSY5cWVvtndf
-
-**第三步：overwrite 写回**
-```bash
-lark-cli docs +update \
-  --doc "<wiki_token>" \
-  --mode overwrite \
-  --markdown "<彩色增强版完整内容>"
-```
-
-**第四步：回填多维表格**（见 Step 4d）
-
-> ⚠️ 注意：Step 4e 是独立步骤，不是注释。必须完整执行 fetch → 生成彩色内容 → overwrite 写回三步。排版后页面效果应达到：正文段落大量彩色词汇、关键数据全部红底红字、列表全部转为 Callout。
+执行 [`../lark-knowledge-upgrade/SKILL.md`](../lark-knowledge-upgrade/SKILL.md) 的完整升级流程，传入当前 record_id。
 
 #### Step 4f: 输出完成汇总
 
 ```
-入库完成 ✅
-自动升级完成 ✅
-自动排版完成 ✅
-
-记录编号：<编号> | 标题：<标题> | 专题：<专题> | 评分：<分>
-主成品页：<URL>
-视角提炼页：<URL>
-
-目录索引已写入：
-- <主专题>/05_案例包/
-- <辅助专题>/05_案例包/
+入库完成 ✅  升级完成 ✅  排版完成 ✅
+<编号> | <标题> | 专题：<专题> | 评分：<分>
+主成品页：<URL>  视角提炼页：<URL>（若有）
 ```
 
 ## 权限

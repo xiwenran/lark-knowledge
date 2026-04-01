@@ -1,6 +1,6 @@
 ---
 name: lark-knowledge-format
-version: 6.4.2
+version: 6.4.3
 description: "飞书文档排版美化：读取现有飞书文档，按飞书正文排版规范（彩色增强版）重写后写回。触发词：排版、美化、格式化、重排。"
 metadata:
   requires:
@@ -45,13 +45,7 @@ lark-cli docs read $node_token
 
 ## Step 2: 文档类型判断
 
-**2a. 结构化内容**（标题/段落/列表结构清晰）
-- **处理策略**：直接按 Step 3 规范重写
-- **识别特征**：有明确章节、逻辑层次、数据表格
-
-**2b. 流水账内容**（纯文本堆砌，无结构）
-- **处理策略**：先提炼主题 → 重组为结构化 → 按 Step 3 重写
-- **识别特征**：段落间无逻辑关系、缺少标题分隔
+结构化内容（有章节层次）→ 直接按 Step 3 重写；流水账内容（纯文本堆砌、无标题分隔）→ 先提炼主题、重组结构，再按 Step 3 重写。
 
 ---
 
@@ -151,16 +145,7 @@ lark-cli docs read $node_token
 
 8. ✅ **对照参考页**：检查颜色密度是否达到 KR-0002 标准
 
-### 3.6 重点句组合表
-
-| 组合类型 | 语法示例 |
-|----------|---------|
-| 数字+背景 | `<text color="red" background-color="light-red">40%+</text>` |
-| 动作+强调 | `<text color="red">快速获取</text>` |
-| 概念+背景 | `<text color="blue" background-color="light-blue">知识生产线</text>` |
-| 结果+背景 | `<text color="green" background-color="light-green">验证成功</text>` |
-
-### 3.7 表格降级规则
+### 3.6 表格降级规则
 
 **⚠️ 飞书 `<lark-table>` 标签不稳定，一律降级为 Markdown 表格**：
 
@@ -183,27 +168,5 @@ lark-cli docs update $node_token --overwrite "重写后的完整内容"
 ```bash
 lark-cli docs read $node_token --limit 100
 ```
-
----
-
-## 常见问题处理
-
-### Q1: 权限不足
-- 运行 `lark-cli auth status` 检查登录状态
-- 运行 `lark-cli auth login` 重新登录
-
-### Q2: 文档无法读取
-- 确认 URL 中的 node_token 正确
-- 确认用户对文档有编辑权限
-
-### Q3: 色彩标签不生效
-- 检查是否有未闭合的 `<text>` 标签
-- 检查是否误用了 `<span style>` 语法
-
-### Q4: 颜色密度不足
-- 按 Step 3.5 自检清单逐项检查
-- 对照参考页 KR-0002 提升密度
-
----
 
 **最终检查**：写回成功后，确认文档在飞书中正确显示彩色效果。

@@ -15,6 +15,7 @@
 | `lark-knowledge-intake` | /收件 | 资料 → 结构化 → 写入多维表格 |
 | `lark-knowledge-upgrade` | /升级 | 表格记录 → 聚合 → 知识库页面 |
 | `lark-knowledge-format` | /排版 | 文档 → 彩色富文本排版美化 |
+| `lark-knowledge-sync` | /同步规范 | config.json 字段定义 → 飞书规范文档（每月自动运行） |
 
 ## 目录结构
 
@@ -29,9 +30,11 @@
 ├── skills/                          # 自定义 Skill
 │   ├── lark-knowledge-intake/      # 收件入表
 │   ├── lark-knowledge-upgrade/      # 聚合升级
-│   └── lark-knowledge-format/      # 排版美化
-└── memory/
-    └── reference_feishu_ids_SAMPLE.md  # Token 示例（脱敏）
+│   ├── lark-knowledge-format/      # 排版美化
+│   └── lark-knowledge-sync/        # 规范同步（月度自动）
+├── scripts/
+│   └── sync-knowledge.sh           # 月度同步脚本（cron 调用）
+└── logs/                            # 自动任务日志
 ```
 
 ## 三个专题
@@ -48,7 +51,7 @@
 
 ## 排版规范版本
 
-当前版本：**v6.4.2**
+当前版本：**v6.4.3**
 
 核心规则：每句话 2-4 个着色词、Callout 替代列表、标题用 `<text color>` 包裹。
 
