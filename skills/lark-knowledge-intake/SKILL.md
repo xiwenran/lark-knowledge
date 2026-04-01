@@ -1,6 +1,6 @@
 ---
 name: lark-knowledge-intake
-version: 2.0.0
+version: 2.0.1
 description: "知识收件入表：将外部资料AI结构化处理后写入飞书多维表格。触发词：收件、入表、收录、处理资料。"
 metadata:
   requires:
@@ -155,7 +155,7 @@ lark-cli base +record-upsert \
 lark-cli docs +fetch --doc "<wiki_token>" --format markdown
 ```
 
-**第二步：生成彩色增强版内容（严格按 lark-knowledge-format v6.3 规则）**
+**第二步：生成彩色增强版内容（严格按 lark-knowledge-format v6.4 规则）**
 - 标题格式：**必须用 `<text color="...">一、标题</text>` 包裹**，禁止 `{color="..."}` 属性
 - 文字颜色：`<text color="...">内容</text>` 闭合标签不许漏
 - 背景高亮：`<text background-color="...">内容</text>` 组合使用
