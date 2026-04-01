@@ -70,10 +70,12 @@ type: project
 `~/.agents/skills/lark-knowledge-config/config.json` 是执行时的唯一数据源：
 - 包含所有 base_token、table_id、wiki 目录 token、字段选项值、规范文档 token
 - 飞书规范文档仅对外展示，不参与执行，按需用 /同步规范 推送
-- 三个 Skill 精简后读取此文件，上下文减少 60%+
+- 四个 Skill 精简后读取此文件，上下文减少 60%+
+- Skills 目录为软链接，指向 /Users/xili/lark-knowledge/skills/，修改仓库即生效
 
 ### 当前执行状态
 - 搭结构：✅ 完成
 - 统一配置+精简 Skill：✅ 完成
-- 第一段（收件入表）：🔜 当前阶段
-- 第二段（聚合升级）：⏳ 待执行
+- 第一段（收件入表）：✅ 已打通，持续收件中（已有3条记录）
+- 第二段（聚合升级）：✅ 已打通，upgrade 正常运行
+- 月度同步规范：✅ cron 已设置（每月1日 09:00 CST）

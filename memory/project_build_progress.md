@@ -19,11 +19,12 @@ type: project
 - 24 个字段全部创建完成
 
 ### 3. 自定义 Skill 创建 ✅
-创建了 3 个自定义 Skill：
-- `lark-knowledge-intake`（/收件）：AI 结构化处理 → 写入多维表格
-- `lark-knowledge-upgrade`（/升级）：聚合高价值记录 → 生成排版精美的知识库页面
+创建了 4 个自定义 Skill：
+- `lark-knowledge-intake`（/收件）：AI 结构化处理 → 写入多维表格 → 评分≥4自动调用 upgrade
+- `lark-knowledge-upgrade`（/升级）：升级流程唯一实现；intake 和手动触发都走此 Skill
 - `lark-knowledge-format`（/排版）：读取文档 → 按飞书富文本规范美化排版
-- 位置：~/.agents/skills/lark-knowledge-*/SKILL.md
+- `lark-knowledge-sync`（/同步规范）：config.json 字段定义 → 飞书规范文档，每月1日自动执行
+- 位置：~/.agents/skills/lark-knowledge-*（软链接指向 /Users/xili/lark-knowledge/skills/，改仓库即生效）
 
 ### 4. 方案文档重构为总控+子文档模式 ✅
 - 总控主文档只做索引，不维护执行细节
@@ -33,17 +34,26 @@ type: project
 ### 5. 引入统一配置文件 + 精简 Skill ✅
 - 创建 `~/.agents/skills/lark-knowledge-config/config.json`（唯一数据源）
   - 包含：base_token、table_id、所有 wiki 目录 token、所有字段选项值、规范文档 token
-- 三个 Skill 全部精简（200+行 → 80-100行），硬编码值改为读取 config.json
-- 创建 `lark-knowledge-sync`（/同步规范）：按需将 config.json 变动推送到飞书规范文档
+- 四个 Skill 全部精简，硬编码值改为读取 config.json
+- intake Step 4 改为引用 upgrade SKILL.md，消除重复逻辑
 
-**好处**：上下文减少 60%+；改 token/字段只改一个文件；弱模型也能稳定执行；知识库有几百上千条也不受影响。
+### 6. 已知 Bug 修复 ✅
+- intake line 162 P0 Bug（minimax 乱码）已修复
+- upgrade Step 5 回填字段格式：select 字段必须用数组格式 `["已升级"]`，字符串格式静默失败
+- format + upgrade 禁止在正文写 `# 标题`（H1），防止与飞书文档元数据标题重复
+- intake Step 1 加入微信文章降级链：Jina → Chrome MCP → 提示 PDF
+
+### 7. 自动化运维 ✅
+- Skills 目录改为软链接（~/.agents/skills/ → 仓库），改仓库即生效无需手动同步
+- cron 月度定时任务：每月1日 09:00 CST 自动执行 /同步规范
+- 日志写入 /Users/xili/lark-knowledge/logs/sync.log
 
 ## 当前状态
 
-**基础结构 + Skill + 统一配置 全部就绪，可以直接用 /收件 开始使用。**
+**全流程已在运行。第一段（收件入表）和第二段（升级建页）均已打通，已有3条入库记录。**
 
 ## 下一步
 1. 搭结构 ✅ 完成
-2. 先打通第一段（资料→表格）🔜 用 /收件 开始
-3. 再做第二段（表格→知识库）⏳ 积累足够资料后用 /升级
-4. 先半自动，再逐步增加自动化 ⏳ 远期目标
+2. 第一段（资料→表格）✅ 已打通，持续收件
+3. 第二段（表格→知识库）✅ 已打通，upgrade 正常运行
+4. 先半自动，再逐步增加自动化 ⏳ 持续优化中
