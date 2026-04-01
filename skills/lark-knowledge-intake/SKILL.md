@@ -25,12 +25,31 @@ metadata:
 
 ### Step 1: 获取内容
 
+**按来源类型处理**：
+
+**飞书文档**：
 ```bash
-# 飞书文档
 lark-cli docs +fetch --doc "<url_or_token>" --format markdown
-# 网页 URL → 使用 WebFetch 工具
-# 纯文本 → 直接处理
 ```
+
+**纯文本**：直接处理。
+
+**微信公众号文章**（`mp.weixin.qq.com`）— 自动降级链：
+
+```
+① Jina AI Reader：WebFetch https://r.jina.ai/<原始URL>
+      ↓ 失败（返回验证页/空内容）
+② Chrome MCP：用 mcp__Claude_in_Chrome__navigate 打开原始URL，
+   再用 mcp__Claude_in_Chrome__get_page_text 读取正文
+      ↓ 失败（仍为验证页）
+③ 提示用户：
+   "微信文章无法自动读取，请选择：
+    A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
+    B. 复制全文粘贴过来"
+   → 用户提供 PDF 后用 PDF Skill 识别；提供文本后直接处理
+```
+
+**其他网页 URL**：使用 WebFetch 工具。
 
 ### Step 2: AI 结构化处理
 
