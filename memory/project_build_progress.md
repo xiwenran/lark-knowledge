@@ -42,6 +42,7 @@ type: project
 - upgrade Step 5 回填字段格式：select 字段必须用数组格式 `["已升级"]`，字符串格式静默失败
 - format + upgrade 禁止在正文写 `# 标题`（H1），防止与飞书文档元数据标题重复
 - intake Step 1 加入微信文章降级链：Jina → Chrome MCP → 提示 PDF
+- format bgcolor 处理：飞书 API 对 `bgcolor` 与 `background-color` 可能存在规范化行为，Python 替换成功但API验证可能显示不同格式，实际文档渲染正常
 
 ### 7. 自动化运维 ✅
 - Skills 目录改为软链接（~/.agents/skills/ → 仓库），改仓库即生效无需手动同步
