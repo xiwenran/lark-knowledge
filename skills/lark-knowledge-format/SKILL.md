@@ -173,6 +173,27 @@ lark-cli docs read $node_token
 | <text color="red">数据1</text> | <text color="blue">数据2</text> | <text color="green">数据3</text> |
 ```
 
+### 3.7 教育类资料专项规则
+
+**适用场景**：课堂实录、教学对话、课文解析、讲义等教育类文字资料。
+
+| 规则 | 说明 |
+|------|------|
+| ❌ 禁止 Callout 高亮块 | 对话/讲课体裁不适合，改用颜色直接着色 |
+| ✅ 段落强制分行 | 每段对话/每个内容行之间**必须有空行**，飞书才能正常换段 |
+| ✅ 文字颜色正常使用 | `<text color>` 着色关键词、术语、数字照常应用 |
+| ✅ 背景颜色正常使用 | `<text background-color>` 超强调照常应用 |
+| ✅ 标题格式不变 | `## <text color="blue">标题</text>` 照常使用 |
+
+**示例**（对话类）：
+```
+<text color="blue">师</text>：今天我们来学习<text color="red">威尼斯的小艇</text>。
+
+<text color="blue">生</text>：威尼斯在哪里？
+
+<text color="blue">师</text>：威尼斯是<text color="orange">意大利</text>的著名水城。
+```
+
 ---
 
 ## Step 4: 写回文档
