@@ -1,13 +1,13 @@
 ---
 name: lark-knowledge-format
-version: 6.4.3
+version: 6.5.0
 description: "飞书文档排版美化：读取现有飞书文档，仅添加视觉格式（颜色/callout/标题样式），不修改任何文字内容，写回文档。触发词：排版、美化、格式化、重排。"
 metadata:
   requires:
     bins: ["lark-cli"]
 ---
 
-# 飞书文档排版美化（彩色增强版 v6.4）
+# 飞书文档排版美化（彩色增强版 v6.5）
 
 **CRITICAL — 开始前 MUST 先用 Read 工具读取：**
 1. `../lark-shared/SKILL.md` — 认证、权限
@@ -32,11 +32,86 @@ metadata:
 ## 核心目标
 
 将飞书文档美化为 **彩色增强版**（仅格式，不改内容）：
-- **颜色密度目标**：每段落 2-4 个着色词，每屏 3-5 处红色
+- **字色密度目标**：**每一句 ≥4 个着色词，上不封顶，宁多勿少**；每屏 ≥5 处红色
+- **背景色密度目标**：**每章节 ≥3 处背景色高亮**（定义/术语/结论/金句/板书）；整篇文档背景色覆盖 ≥ 字色密度的 1/5
+- **核心原则**：**可以多，不能少**——着色只嫌少不嫌多，字色 + 背景色双管齐下
 - **视觉层次**：二级标题蓝色、关键词高亮、Grid 分栏展示
 - **内容结构**：零列表（全 Callout 化）、多样 emoji、逻辑分块
 
 **参考标准**：https://www.feishu.cn/wiki/STMFws3lIiSmWMktSY5cWVvtndf （KR-0002，自检时对照）
+
+## 着色词类别清单（通用，适用所有文档类型）
+
+**原则**：以下所有类别的词都**应当着色**。遇到任何一类词，默认都加颜色；只有纯粹的连接虚词（"的、了、吗、呢"等）可以不着色。
+
+| 类别 | 示例 | 推荐颜色 |
+|------|------|---------|
+| **名词-专名** | 人名、地名、书名、机构名、作品名 | `blue` / `purple` |
+| **名词-概念** | 方法论、术语、流派、理论 | `blue` |
+| **数字/时间/日期** | 1927年、十六年、第四声、40% | `red` |
+| **强动作动词** | 烧掉、昏倒、冲进、抓住、砸碎、拔掉 | `red` |
+| **普通动词** | 发现、记住、想想、看看 | `orange` |
+| **形容词-褒义** | 慈祥、坚贞、从容、沉着、伟大 | `green` |
+| **形容词-贬义/严峻** | 残忍、粗暴、凶残、紧张、严峻、可怕 | `red` |
+| **形容词-中性** | 含糊、平静、乱蓬蓬 | `orange` |
+| **语气词/强调副词** | 竟然、突然、一下子、根本、完全、永远、绝对、一定、最 | `red` |
+| **疑问词** | 为什么、怎么、哪能、难道、是不是 | `orange` |
+| **时间副词** | 马上、立刻、顿时、终于、依然、仍旧、一直 | `orange` |
+| **情感强调词** | 念念不忘、一字不吐、毫不畏惧、无私无畏 | `red` + `background-color="light-yellow"` |
+| **关联词/逻辑词** | 但是、然而、因为、所以、虽然、即使 | `orange`（选择性） |
+| **写作手法/修辞** | 倒叙、对比、首尾呼应、语言描写 | `blue` |
+| **核心结论句** | 教师点睛句、总结句 | `red` + `background-color="light-red"` |
+| **板书/批注** | `[板书：xxx]` | `background-color="light-yellow"` |
+
+**⚠️ 关键提醒**：
+- 见到上表任何一类词，**默认先加颜色**，而不是默认不加
+- **宁可一句话里 6-8 个着色词，也不要只有 1-2 个**
+- 适当加入"可有可无"的着色也没问题——**多了无害，少了失效**
+- 如果一句话读下来没有任何颜色，说明漏着色了，必须补
+
+## 背景色使用清单（通用，与字色同等重要）
+
+**原则**：背景色比纯字色**视觉权重更高**，适合"点睛之笔"。不要只用字色，背景色要**大胆使用、成片铺开**。
+
+**飞书支持的背景色**（全部可用）：
+`light-red` / `light-orange` / `light-yellow` / `light-green` / `light-blue` / `light-purple` / `grey`
+
+### 背景色应用场景表
+
+| 背景色 | 使用场景 | 示例语法 |
+|-------|---------|------|
+| **light-yellow**（最常用） | 术语/定义/核心概念/关键金句 | `<text background-color="light-yellow">倒叙</text>`、`<text background-color="light-yellow">时间顺序</text>` |
+| **light-red** | 强结论/震撼事实/强烈转折 | `<text background-color="light-red">被害</text>`、`<text background-color="light-red">一字不吐</text>` |
+| **light-blue** | 板书/框架/方法论名称 | `<text background-color="light-blue">[板书：xxx]</text>` |
+| **light-green** | 褒扬/精神品质/成功结论 | `<text background-color="light-green">从容就义</text>`、`<text background-color="light-green">坚贞不屈</text>` |
+| **light-orange** | 注意事项/警示/重点提示 | `<text background-color="light-orange">注意</text>`、`<text background-color="light-orange">危险逼近</text>` |
+| **light-purple** | 特殊标识/引用金句/诗句 | `<text background-color="light-purple">铁肩担道义，妙手著文章</text>` |
+| **grey** | 次要说明/括号备注 | `<text background-color="grey">[停顿]</text>`、`<text background-color="grey">[环视全班]</text>` |
+
+### 背景色使用密度要求
+
+- **每章节 ≥3 处背景色**，短章节至少 2 处，长章节 5-8 处
+- **术语首次出现必须背景色**：如"倒叙""首尾呼应""对比""时间顺序"第一次被讲到时,必须加 `light-yellow` 背景
+- **金句名言必须背景色**：诗句、名言、口号、核心总结句,一律加背景(配合红字)
+- **板书全部背景色**：`[板书：xxx]` 一律加 `light-blue` 或 `light-yellow`
+- **强转折/强结论必须背景色**：如"但是没有走""一字都没透露"这种戏剧性转折
+
+### 字色 vs 背景色选择原则
+
+- **字色** = 常规着色,覆盖面广,用于日常关键词
+- **背景色** = 高权重高亮,**每章节必须至少 3 处**,用于定义/结论/金句
+- **字色 + 背景色组合** = 超强调,`<text color="red" background-color="light-yellow">` 用于核心金句
+- **原则**：字色铺底,背景色点睛。光有字色 → 稀;光有背景色 → 乱;**两者搭配才是彩色增强版的精髓**
+
+### 为什么颜色会偏稀？（根因诊断，历史教训）
+
+过往产出常出现颜色密度不足，根因如下，写本规则时已针对性修复：
+
+1. **目标值定得太低**：原来写"每段 2-4 个着色词"，模型会照最低值执行 → **现改为"每句 ≥4,上不封顶"**
+2. **着色类别过窄**：原来只列了名词/专名/数字，漏掉动词、形容词、语气词、疑问词、副词等口语高频词 → **现补充完整类别清单,覆盖所有实词**
+3. **缺少"宁多勿少"原则**：没明确告诉模型可以多着色，模型会默认保守 → **现明确"可以多,不能少;多了无害,少了失效"**
+4. **自检清单是"上限暗示"**：原来写"目标每段 2-4 个"被当成上限 → **现改为"强制计数 ≥4,少了必须补"**
+5. **示例密度本身就低**：抄示例会复制稀疏风格 → **现示例每句 4-8 个着色词,动词/形容词/语气词全染色**
 
 ---
 
@@ -73,27 +148,50 @@ lark-cli docs +fetch --doc $node_token
 - ✅ 正文直接从第一个内容块开始（引言区块、Callout、或 `##` 二级标题）
 - 若读取到的原文开头有 `# 标题`，**重写时必须删掉这一行**
 
-### 3.1 颜色语法表
+### 3.1 颜色语法速查（何时用哪种颜色请查上方清单）
+
+> **⚠️ 使用场景指引的权威位置**：
+> - **字色该用哪种** → 看上方 **"着色词类别清单"**（15 类词 → 颜色映射）
+> - **背景色该用哪种** → 看上方 **"背景色使用清单"**（7 种背景色 → 场景映射）
+> - **本节（3.1）仅作语法速查**：列出所有合法的 `<text>` 标签形式,不重复场景指引
 
 ⚠️ **强制禁令（任何情况都不许出现）**：
 - ❌ `<span style="...">...</span>` ← 飞书不识别，强制禁止
+- ❌ `<text style="color:red">` / `<text style="background-color:...">` ← `style=` 属性飞书不识别
 - ❌ `font` / `font-weight` / `background` 单独使用
-- ✅ 一律使用飞书原生标签：`<text color>` 和 `<text background-color>`
+- ✅ 一律使用飞书原生标签属性：`<text color="...">` 和 `<text background-color="...">`
 
-**正确语法（必须有闭合标签）**：
+**合法的字色标签（5 种）**：
 
-| 效果 | 语法 | 使用场景 |
-|------|------|---------|
-| 红字 | `<text color="red">文字</text>` | **大量使用**：数字/时间节点/动作词/强调效果 |
-| 蓝字 | `<text color="blue">文字</text>` | 概念词/方法论/工具名 |
-| 绿字 | `<text color="green">文字</text>` | 积极结果/成功指标 |
-| 橙字 | `<text color="orange">文字</text>` | 注意事项/中性数据 |
-| 紫字 | `<text color="purple">文字</text>` | 特殊标识/分类标签 |
-| 红底高亮 | `<text background-color="light-red">文字</text>` | 强结论/风险提醒 |
-| 黄底高亮 | `<text background-color="light-yellow">文字</text>` | 重要概念/关键步骤 |
-| 蓝底高亮 | `<text background-color="light-blue">文字</text>` | 方法论/框架思路 |
-| 绿底高亮 | `<text background-color="light-green">文字</text>` | 积极结果/成功经验 |
-| 组合高亮 | `<text color="red" background-color="light-red">文字</text>` | **超强调**（一个标签两属性） |
+| 语法 |
+|------|
+| `<text color="red">文字</text>` |
+| `<text color="blue">文字</text>` |
+| `<text color="green">文字</text>` |
+| `<text color="orange">文字</text>` |
+| `<text color="purple">文字</text>` |
+
+**合法的背景色标签（7 种，与 3.0 背景色清单完全对齐）**：
+
+| 语法 |
+|------|
+| `<text background-color="light-red">文字</text>` |
+| `<text background-color="light-orange">文字</text>` |
+| `<text background-color="light-yellow">文字</text>` |
+| `<text background-color="light-green">文字</text>` |
+| `<text background-color="light-blue">文字</text>` |
+| `<text background-color="light-purple">文字</text>` |
+| `<text background-color="grey">文字</text>` |
+
+**字色 + 背景色组合语法（超强调，单标签两属性）**：
+
+```
+<text color="red" background-color="light-yellow">核心金句</text>
+<text color="red" background-color="light-red">强结论</text>
+<text color="green" background-color="light-green">褒扬</text>
+```
+
+⚠️ **禁止嵌套**：`<text color="red"><text background-color="light-red">...</text></text>` 是错的,必须写成单标签两属性。
 
 ### 3.2 标题格式
 
@@ -144,21 +242,32 @@ lark-cli docs +fetch --doc $node_token
    - ❌ 错误：`<text color="red"><text background-color="light-red">文字</text></text>`
    - ✅ 正确：`<text color="red" background-color="light-red">文字</text>`
 
-3. ✅ **列表→Callout**：零列表，全部改为 Callout
+3. ✅ **列表→Callout**：零列表，全部改为 Callout（**教育类例外**：改为分行段落，不用 Callout）
    - ❌ 错误：`- 要点1` `- 要点2`
-   - ✅ 正确：两个独立 Callout
+   - ✅ 正确（通用）：两个独立 Callout
+   - ✅ 正确（教育类）：两个独立段落,段落间空行
 
 4. ✅ **标题用 `<text color>` 包裹**：
    - ❌ 错误：`## 标题 {color="blue"}`
    - ✅ 正确：`## <text color="blue">标题</text>`
 
-5. ✅ **每章节 ≥1 Callout**：增强视觉层次
+5. ✅ **每章节 ≥1 Callout**：增强视觉层次（**教育类例外**：教育类禁用 Callout，改为高密度颜色替代）
 
-6. ✅ **每句话自查：有没有颜色？** 目标每段 2-4 个着色词
+6. ✅ **每句话强制计数：着色词 ≥4 个**（宁多勿少）
+   - 写完每段后，逐句数一下着色词数量
+   - 少于 4 个 → 回头补充，按"着色词类别清单"从动词/形容词/语气词/副词里挑
+   - **原则**：可以多，不能少；多了无害，少了失效
 
-7. ✅ **主文档标题有颜色或 Callout**：
-   - ❌ 错误：`# 纯标题`
-   - ✅ 正确：`# <text color="blue">标题</text>` 或下方加 Callout
+6b. ✅ **每章节强制计数：背景色 ≥3 处**（字色 + 背景色双管齐下）
+   - 写完每章节后，数一下带 `background-color` 的标签数量
+   - 少于 3 处 → 回头加背景色，按"背景色应用场景表"挑:术语/结论/金句/板书
+   - **原则**：不能只靠字色，背景色才是视觉爆点;字色铺底、背景色点睛
+
+7. ✅ **正文首屏有强视觉锚点**（替代 H1）：
+   - 3.0 已禁止正文写 `# H1`（飞书标题已在元数据层）
+   - 所以正文必须以**引言 Callout 或强着色段落**作为视觉开场（教育类则以高密度着色的 `##` 二级标题 + 首段开场）
+   - ❌ 错误：原文开头的 `# 纯标题` 未删除
+   - ✅ 正确：删掉 H1，直接用 Callout / 高亮段落 / 彩色 H2 开场
 
 8. ✅ **对照参考页**：检查颜色密度是否达到 KR-0002 标准
 
@@ -185,9 +294,9 @@ lark-cli docs +fetch --doc $node_token
 | ❌ 禁止 Callout 高亮块 | 对话/讲课体裁不适合，改用颜色直接着色 |
 | ✅ 段落强制分行 | 每段对话/每个内容行之间**必须有空行**，飞书才能正常换段 |
 
-**其余规则完全不变**：颜色密度（每段 2-4 个着色词）、`##` 标题用 `<text color="blue">` 包裹、`<text background-color>` 背景高亮、文字语法——全部照通用规范执行。
+**其余规则完全不变**：颜色密度（**每句 ≥4 个着色词，宁多勿少**）、`##` 标题用 `<text color="blue">` 包裹、`<text background-color>` 背景高亮、文字语法——全部照通用规范执行，参照"着色词类别清单"全类别覆盖。
 
-**⚠️ 核心提醒：颜色密度不能因为是对话体裁就降低，每个师生发言段落都要有 2-4 个着色词。**
+**⚠️ 核心提醒：颜色密度不能因为是对话体裁就降低，反而因为对话口语化、动词/语气词/疑问词密集，更应该大量着色。每句师生发言都要 ≥4 个着色词，能多不能少。**
 
 **教育类内容着色指引**：
 
@@ -203,16 +312,20 @@ lark-cli docs +fetch --doc $node_token
 | 积极感情/褒义词 | `green` | `<text color="green">坚贞不屈</text>` |
 | 師/生 角色标识 | `blue`（师）/ 不着色（生，保持黑色即可） | `<text color="blue">师</text>` |
 
-**示例**（高颜色密度对话）：
+**示例**（高颜色密度对话——**每句 ≥4 个着色词**）：
 ```
-<text color="blue">师</text>：同学们，今天我们要学的是<text color="red">《十六年前的回忆》</text>，作者是<text color="blue">李星华</text>。
+<text color="blue">师</text>：<text color="orange">同学们</text>，<text color="red">今天</text>咱们要学的是<text color="red">《十六年前的回忆》</text>，作者是<text color="blue">李星华</text>，她的父亲就是<text color="blue">李大钊</text>。
 
-<text color="blue">师</text>：文章开头就写了<text color="red">1927年4月28日</text>，这是一种叫做<text color="blue">倒叙</text>的写法——先写<text color="orange">结局</text>，再回忆<text color="orange">经过</text>。
+<text color="blue">师</text>：文章<text color="orange">一开头</text>就写了<text color="red">1927年4月28日</text>，这是一种叫做<text color="blue">倒叙</text>的写法——<text color="orange">先</text>写<text color="red">结局</text>，<text color="orange">再</text>回忆<text color="red">经过</text>，<text color="red">一下子</text>就把读者<text color="green">抓住</text>了。
 
-**生**：为什么要用倒叙？
+**生**：<text color="orange">为什么</text>要用<text color="blue">倒叙</text>？<text color="orange">直接</text>按顺序写<text color="red">不行</text>吗？
 
-<text color="blue">师</text>：因为这样写能<text color="green">制造悬念</text>，让读者从第一句话就想知道<text color="red">谁被害了</text>、<text color="red">为什么</text>。
+<text color="blue">师</text>：问得<text color="green">好</text>！因为这样写<text color="red">能</text><text color="green">制造悬念</text>，让读者从<text color="red">第一句</text>话就<text color="red">迫切</text>想知道<text color="red">谁被害了</text>、<text color="red">为什么</text>、<text color="red">怎么</text>被害的。这就是<text color="blue">倒叙</text>的<text color="red">力量</text>。
 ```
+
+**密度对比**：
+- ❌ **稀疏（错误）**：一句话只有 1-2 个着色词,读起来跟黑白稿差不多
+- ✅ **饱满（正确）**：一句话 4-8 个着色词,**动词、形容词、语气词、时间副词、疑问词全部染色**,视觉上"花枝招展"才对
 
 ---
 
