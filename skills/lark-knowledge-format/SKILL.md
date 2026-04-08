@@ -177,21 +177,40 @@ lark-cli docs read $node_token
 
 **适用场景**：课堂实录、教学对话、课文解析、讲义等教育类文字资料。
 
-| 规则 | 说明 |
-|------|------|
+**与通用规则的差异（仅这两点不同，其余完全沿用通用格式规范）**：
+
+| 差异点 | 教育类规则 |
+|--------|-----------|
 | ❌ 禁止 Callout 高亮块 | 对话/讲课体裁不适合，改用颜色直接着色 |
 | ✅ 段落强制分行 | 每段对话/每个内容行之间**必须有空行**，飞书才能正常换段 |
-| ✅ 文字颜色正常使用 | `<text color>` 着色关键词、术语、数字照常应用 |
-| ✅ 背景颜色正常使用 | `<text background-color>` 超强调照常应用 |
-| ✅ 标题格式不变 | `## <text color="blue">标题</text>` 照常使用 |
 
-**示例**（对话类）：
+**其余规则完全不变**：颜色密度（每段 2-4 个着色词）、`##` 标题用 `<text color="blue">` 包裹、`<text background-color>` 背景高亮、文字语法——全部照通用规范执行。
+
+**⚠️ 核心提醒：颜色密度不能因为是对话体裁就降低，每个师生发言段落都要有 2-4 个着色词。**
+
+**教育类内容着色指引**：
+
+| 着色对象 | 颜色 | 示例 |
+|---------|------|------|
+| 课文标题/篇名 | `red` | `<text color="red">十六年前的回忆</text>` |
+| 人名/作者 | `blue` | `<text color="blue">李大钊</text>` |
+| 年代/数字/时间 | `red` | `<text color="red">1927年</text>` |
+| 写作手法/修辞 | `blue` | `<text color="blue">倒叙</text>`、`<text color="blue">首尾呼应</text>` |
+| 生字词/重点词 | `orange` | `<text color="orange">避免</text>`、`<text color="orange">严峻</text>` |
+| 核心结论/总结语 | `red` 或 `background-color="light-red"` | 教师点睛句 |
+| 板书内容 | `background-color="light-yellow"` | `[板书：xxx]` |
+| 积极感情/褒义词 | `green` | `<text color="green">坚贞不屈</text>` |
+| 師/生 角色标识 | `blue`（师）/ 不着色（生，保持黑色即可） | `<text color="blue">师</text>` |
+
+**示例**（高颜色密度对话）：
 ```
-<text color="blue">师</text>：今天我们来学习<text color="red">威尼斯的小艇</text>。
+<text color="blue">师</text>：同学们，今天我们要学的是<text color="red">《十六年前的回忆》</text>，作者是<text color="blue">李星华</text>。
 
-<text color="blue">生</text>：威尼斯在哪里？
+<text color="blue">师</text>：文章开头就写了<text color="red">1927年4月28日</text>，这是一种叫做<text color="blue">倒叙</text>的写法——先写<text color="orange">结局</text>，再回忆<text color="orange">经过</text>。
 
-<text color="blue">师</text>：威尼斯是<text color="orange">意大利</text>的著名水城。
+**生**：为什么要用倒叙？
+
+<text color="blue">师</text>：因为这样写能<text color="green">制造悬念</text>，让读者从第一句话就想知道<text color="red">谁被害了</text>、<text color="red">为什么</text>。
 ```
 
 ---
