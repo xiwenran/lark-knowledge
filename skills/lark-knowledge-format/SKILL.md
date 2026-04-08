@@ -1,7 +1,7 @@
 ---
 name: lark-knowledge-format
 version: 6.4.3
-description: "飞书文档排版美化：读取现有飞书文档，按飞书正文排版规范（彩色增强版）重写后写回。触发词：排版、美化、格式化、重排。"
+description: "飞书文档排版美化：读取现有飞书文档，仅添加视觉格式（颜色/callout/标题样式），不修改任何文字内容，写回文档。触发词：排版、美化、格式化、重排。"
 metadata:
   requires:
     bins: ["lark-cli"]
