@@ -48,7 +48,8 @@ metadata:
 
 **1b. 读取文档**
 ```bash
-lark-cli docs read $node_token
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+lark-cli docs +fetch --doc $node_token
 ```
 
 ---
@@ -219,12 +220,14 @@ lark-cli docs read $node_token
 
 **4a. overwrite 写回**
 ```bash
-lark-cli docs update $node_token --overwrite "重写后的完整内容"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+lark-cli docs +update --doc $node_token --mode overwrite --markdown "重写后的完整内容"
 ```
 
 **4b. 确认更新**
 ```bash
-lark-cli docs read $node_token --limit 100
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+lark-cli docs +fetch --doc $node_token
 ```
 
 **最终检查**：写回成功后，确认文档在飞书中正确显示彩色效果。
