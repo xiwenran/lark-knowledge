@@ -19,11 +19,12 @@ type: project
 - 24 个字段全部创建完成
 
 ### 3. 自定义 Skill 创建 ✅
-创建了 4 个自定义 Skill：
+创建了 5 个自定义 Skill：
 - `lark-knowledge-intake`（/收件）：AI 结构化处理 → 写入多维表格 → 评分≥4自动调用 upgrade
-- `lark-knowledge-upgrade`（/升级）：升级流程唯一实现；intake 和手动触发都走此 Skill
-- `lark-knowledge-format`（/排版）：读取文档 → 按飞书富文本规范美化排版
+- `lark-knowledge-upgrade`（/升级）：升级流程唯一实现；intake 和手动触发都走此 Skill；支持 Karpathy 风格交叉引用和洞察归档
+- `lark-knowledge-format`（/排版）：读取文档 → 按飞书富文本规范美化排版（v6.5.0：字色+背景色双管齐下）
 - `lark-knowledge-sync`（/同步规范）：config.json 字段定义 → 飞书规范文档，每月1日自动执行
+- `lark-knowledge-lint`（巡检）：扫描积压预警、孤岛词条、关键词缺口，输出巡检报告
 - 位置：~/.agents/skills/lark-knowledge-*（软链接指向 /Users/xili/lark-knowledge/skills/，改仓库即生效）
 
 ### 4. 方案文档重构为总控+子文档模式 ✅

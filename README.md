@@ -16,6 +16,7 @@
 | `lark-knowledge-upgrade` | /升级 | 表格记录 → 聚合 → 知识库页面 |
 | `lark-knowledge-format` | /排版 | 文档 → 彩色富文本排版美化 |
 | `lark-knowledge-sync` | /同步规范 | config.json 字段定义 → 飞书规范文档（每月自动运行） |
+| `lark-knowledge-lint` | 巡检 | 扫描积压/孤岛/矛盾，输出巡检报告 |
 
 ## 目录结构
 
@@ -31,7 +32,8 @@
 │   ├── lark-knowledge-intake/      # 收件入表
 │   ├── lark-knowledge-upgrade/      # 聚合升级
 │   ├── lark-knowledge-format/      # 排版美化
-│   └── lark-knowledge-sync/        # 规范同步（月度自动）
+│   ├── lark-knowledge-sync/        # 规范同步（月度自动）
+│   └── lark-knowledge-lint/        # 巡检扫描
 ├── scripts/
 │   └── sync-knowledge.sh           # 月度同步脚本（cron 调用）
 └── logs/                            # 自动任务日志
@@ -51,7 +53,7 @@
 
 ## 排版规范版本
 
-当前版本：**v6.4.3**
+当前版本：**v6.5.0**
 
 核心规则：每句话 2-4 个着色词、Callout 替代列表、标题用 `<text color>` 包裹。
 
