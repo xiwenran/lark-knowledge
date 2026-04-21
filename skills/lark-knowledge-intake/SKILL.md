@@ -27,6 +27,17 @@ metadata:
 
 **按来源类型处理**：
 
+### 多源抓取器（fetchers）
+
+`lark-knowledge-intake` 内部已预留 `fetchers/` 子模块，用于先按 URL / 文件自动识别 `source_type`，再路由到对应 fetcher。
+
+- 文件优先按扩展名识别
+- URL 再按已知域名识别
+- 无法命中时走 `fallback`
+- 对应路径后续若抓取失败，可标记为 `fetch_failed`
+
+P11.1 阶段只完成分发器与统一返回契约，不改变当前对外工作流。
+
 **飞书文档**：
 ```bash
 lark-cli docs +fetch --doc "<url_or_token>" --format markdown
@@ -36,12 +47,21 @@ lark-cli docs +fetch --doc "<url_or_token>" --format markdown
 
 **微信公众号文章**（`mp.weixin.qq.com`）：
 
-直接提示用户：
+两条路径：
+
+A. **自动抓取（推荐，需首次扫码）**：运行 `python -m fetchers.wechat --login`，在弹出浏览器里扫码一次。登录态保存到 `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`（仅本机使用，不入仓）。cookie 过期时重跑 `--login`。
+
+B. **手动兜底（未配置 Playwright 或自动抓取失败时）**：
 > "微信文章无法自动读取，请选择：
 > A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
 > B. 复制全文粘贴过来"
 
 用户提供 PDF 后用 PDF Skill 识别；提供文本后直接处理。
+
+**登录态社交平台**（`x.com` / `twitter.com` / `zhihu.com` / `xiaohongshu.com`）：
+
+- 首次真实使用前需先安装 OpenCLI 的 Chrome Browser Bridge 扩展，并安装 Node.js CLI。
+- 将 OpenCLI 绝对路径写入 `~/.claude/skills/lark-knowledge-intake/.local/opencli_config/opencli_path`。
 
 **其他网页 URL**：使用 WebFetch 工具。
 

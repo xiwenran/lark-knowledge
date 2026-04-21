@@ -3,6 +3,7 @@ config.json
 *.token
 *.secret
 .env
+skills/lark-knowledge-intake/.local/
 
 # macOS
 .DS_Store
@@ -10,3 +11,7 @@ config.json
 # IDE
 .idea/
 .vscode/
+
+# Python
+__pycache__/
+*.pyc
