@@ -1,1 +1,2 @@
 networkx>=3.0,<4.0
+python-louvain>=0.16,<0.17
