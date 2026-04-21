@@ -22,7 +22,7 @@
 - 涉及文件:`skills/lark-knowledge-lint/SKILL.md`、可能新增 `scripts/lark_lint/community.py`
 - 参数调优:Obsidian 端用内聚度 < 0.15 判松散;lark-knowledge 规模更大,阈值和 Top N 可能需要放宽(首跑后调)
 - 验收:松散聚类清单能指向真实的"没整理完"区块
-- 状态:⏸ 待启动
+- 状态:✅ 已完成（commit `6408931`）
 
 ### P1-C:新建 lark-knowledge-research skill 框架
 - 目标:搭骨架——触发词、默认路径、与 lint 的协作契约、草稿写回位置
