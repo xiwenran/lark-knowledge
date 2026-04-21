@@ -37,7 +37,7 @@
 - 涉及文件:`skills/lark-knowledge-research/SKILL.md`、`scripts/lark_research/*.py`
 - 前置:用户已有 Tavily API 订阅,密钥走 env 变量不硬编码
 - 验收:针对一个真实空白主题,能产出可读的草稿写入飞书"待确认"区
-- 状态:⏸ 待启动
+- 状态:✅ 已完成（commit `ee2d23e`）
 
 ### P1-E:两个 skill 联动闭环
 - 目标:lint 扫出空白 → research 批量补 → 用户确认后写入正式库
