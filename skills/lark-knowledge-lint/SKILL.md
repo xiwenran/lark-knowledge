@@ -129,3 +129,20 @@ D. 矛盾检测（仅深度巡检时）
 ## 权限
 
 `bitable:record`、`docx:document`、`wiki:node:readonly`
+
+---
+
+## 补链建议
+
+**触发词**
+- `补链`
+- `link suggestions`
+
+**调用约定**
+- 先读取 `config.json`（优先仓库内，其次 `~/.agents/skills/lark-knowledge-config/config.json`），获取 `base.base_token` 与 `base.table_id`
+- 进入 `scripts/lark_lint/` 后运行 `python lint_links.py --top-n 50`
+- 脚本只读拉取飞书多维表格记录与知识库页面内容，生成建议报告后直接打印到 stdout，不写回飞书
+
+**输出格式**
+- 表格列固定为：`排名`、`节点A`、`节点B`、`四信号得分`、`推荐理由`
+- `推荐理由` 展示四信号算法产生的命中原因，供人工判断是否需要补链

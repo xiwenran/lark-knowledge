@@ -30,7 +30,7 @@
 - 触发词(建议):补空白 / Deep Research / 研究补漏
 - 与 lint 的协作:P1-B 产出的空白/松散聚类清单可作为 research 的输入
 - 验收:skill 可被触发,输出结构化的研究任务清单(尚未真跑 API)
-- 状态:✅ 已完成（commit hash 待填写）
+- 状态:✅ 已完成（commit `01a96d7`）
 
 ### P1-D:research skill 接入 Tavily API
 - 目标:空白识别 → Tavily 搜索 → LLM 提炼 → 回写飞书草稿
