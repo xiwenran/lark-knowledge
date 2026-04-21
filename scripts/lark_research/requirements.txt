@@ -1,4 +1,1 @@
-# P1-C skeleton only.
-# Do not add Tavily dependencies in this phase.
-# P1-D is expected to add the real search client dependency here, for example:
-# tavily-python==<version>
+requests>=2.28.0
