@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import sys
+import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,38 @@ def _is_generic_web_url(url_or_path: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
 
 
+def _is_http_url(url_or_path: str) -> bool:
+    # 与 _is_generic_web_url 语义相同，独立命名是为了让 dispatch 层"是否为 URL"的判定读起来更显眼。
+    return _is_generic_web_url(url_or_path)
+
+
+REMOTE_DOCUMENT_TIMEOUT_SECONDS = 60
+REMOTE_DOCUMENT_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+
+def _download_remote_document(url: str, suffix: str) -> Path:
+    # 远程文档只做最小可用的下载（followed redirects by urllib 默认支持），拿到本地临时文件再交给 markitdown。
+    request = Request(url, headers={"User-Agent": REMOTE_DOCUMENT_USER_AGENT})
+    fd, temp_path = tempfile.mkstemp(suffix=suffix or "")
+    try:
+        with urlopen(request, timeout=REMOTE_DOCUMENT_TIMEOUT_SECONDS) as response, open(fd, "wb") as out:
+            while True:
+                chunk = response.read(64 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+    except Exception:
+        try:
+            Path(temp_path).unlink(missing_ok=True)
+        except Exception:  # pragma: no cover
+            pass
+        raise
+    return Path(temp_path)
+
+
 def _detect_from_domain(url_or_path: str) -> str | None:
     hostname = _extract_hostname(url_or_path)
     path = _extract_path(url_or_path)
@@ -224,6 +258,17 @@ def dispatch(url_or_path: str) -> FetchResult:
         )
 
     if source_type == "fallback":
+        # 修复：fallback 分支只对 http/https URL 走外网抓取，避免非 URL 的自由文本被外发到 r.jina.ai / archive.today。
+        if not _is_http_url(normalized):
+            return FetchResult(
+                markdown=None,
+                title=None,
+                meta={"routed": True, "fetcher_active": False, "reason": "not_an_http_url"},
+                source_type="fallback",
+                url_or_path=normalized,
+                success=False,
+                error="输入既不是可识别的 URL，也不是本地文件路径；无法分发抓取",
+            )
         primary = _article_fetcher.fetch(normalized)
         if primary.success:
             primary.source_type = "fallback"
@@ -246,6 +291,39 @@ def dispatch(url_or_path: str) -> FetchResult:
         )
 
     if source_type in {"doc_pdf", "doc_docx", "doc_pptx", "doc_xlsx", "doc_epub"}:
+        # 修复：本地路径直接交给 markitdown；远程 URL 先下载到临时文件，再调 document.fetch，最后清理。
+        if _is_http_url(normalized):
+            suffix = Path(urlparse(normalized).path).suffix.lower()
+            temp_path: Path | None = None
+            try:
+                temp_path = _download_remote_document(normalized, suffix)
+                result = _document_fetcher.fetch(str(temp_path))
+                # 保留用户可识别的原始 URL，而不是临时路径。
+                result.url_or_path = normalized
+                existing_meta = result.meta if isinstance(result.meta, dict) else {}
+                result.meta = {
+                    **existing_meta,
+                    "remote_source_url": normalized,
+                    "downloaded_to": str(temp_path),
+                }
+                return result
+            except Exception as exc:
+                logger.warning("Dispatch failed to download remote document %s: %s", normalized, exc)
+                return FetchResult(
+                    markdown=None,
+                    title=None,
+                    meta={"routed": True, "fetcher_active": True, "remote_source_url": normalized},
+                    source_type="fetch_failed",
+                    url_or_path=normalized,
+                    success=False,
+                    error=f"远程文档下载失败: {exc}",
+                )
+            finally:
+                if temp_path is not None:
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except Exception:  # pragma: no cover
+                        pass
         return _document_fetcher.fetch(normalized)
 
     if source_type == "arxiv":
@@ -254,7 +332,9 @@ def dispatch(url_or_path: str) -> FetchResult:
     if source_type == "wechat_mp":
         return _wechat_fetcher.fetch(normalized)
 
-    if source_type in {"tweet", "zhihu", "xhs_note"} and _opencli_fetcher.OPENCLI_CONFIG_PATH.is_file():
+    if source_type in {"tweet", "zhihu", "xhs_note"}:
+        # 修复：dispatcher 不再用 OPENCLI_CONFIG_PATH.is_file() 做前置门；让 bridge 自己决定
+        # "读配置文件 / 从 PATH 发现 / 给出未配置错误"，保持与 opencli_bridge 文档一致。
         return _opencli_fetcher.fetch(normalized)
 
     if source_type in {"video_bilibili", "video_youtube", "podcast"}:

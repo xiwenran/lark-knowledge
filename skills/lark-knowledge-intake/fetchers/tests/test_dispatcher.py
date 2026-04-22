@@ -67,24 +67,77 @@ class DispatcherTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(module.detect_source_type(value), expected)
 
-    def test_dispatch_returns_failed_fetch_result_for_unsupported_active_fetcher(self) -> None:
+    def test_dispatch_routes_social_urls_through_opencli_bridge(self) -> None:
+        # dispatcher 不再在 bridge 之前做 config-file 门控；无论配置是否存在，社交类 URL 都进入 bridge。
+        module = load_dispatcher_module()
+        fetch_result_module = load_module("lk_fetchers_types_test_dispatcher_opencli", TYPES_PATH)
+        fake_success = fetch_result_module.FetchResult(
+            markdown="# ok",
+            title="ok",
+            meta={"cli_path": "/usr/local/bin/opencli"},
+            source_type="tweet",
+            url_or_path="https://x.com/user/status/1",
+            success=True,
+            error=None,
+        )
+
+        with patch.object(module._opencli_fetcher, "fetch", return_value=fake_success) as fetch_mock:
+            result = module.dispatch("https://x.com/user/status/1")
+
+        fetch_mock.assert_called_once_with("https://x.com/user/status/1")
+        self.assertTrue(result.success)
+        self.assertEqual(result.source_type, "tweet")
+
+    def test_dispatch_rejects_non_url_fallback_input_locally(self) -> None:
+        # 自由文本不再被外发给 r.jina.ai / archive.today，直接返回本地校验错误。
         module = load_dispatcher_module()
 
-        result = module.dispatch("https://x.com/user/status/1")
+        with patch.object(module._article_fetcher, "fetch") as article_mock, patch.object(
+            module._archive_fetcher, "fetch"
+        ) as archive_mock:
+            result = module.dispatch("random free text")
 
+        article_mock.assert_not_called()
+        archive_mock.assert_not_called()
         self.assertFalse(result.success)
-        self.assertEqual(result.source_type, "tweet")
-        self.assertEqual(result.url_or_path, "https://x.com/user/status/1")
-        self.assertIsNone(result.markdown)
-        self.assertIsNotNone(result.error)
-        self.assertIn("No active fetcher", result.error)
-        self.assertEqual(
-            result.meta,
-            {
-                "routed": True,
-                "fetcher_active": False,
-            },
+        self.assertEqual(result.source_type, "fallback")
+        self.assertEqual(result.url_or_path, "random free text")
+        self.assertEqual(result.meta.get("reason"), "not_an_http_url")
+        self.assertIn("URL", result.error or "")
+
+    def test_dispatch_downloads_remote_document_url_before_conversion(self) -> None:
+        # 远程 PDF/DOC URL 必须先下载到临时文件，再由 markitdown 处理；返回结果保留原始 URL。
+        module = load_dispatcher_module()
+        fetch_result_module = load_module("lk_fetchers_types_test_dispatcher_remote_doc", TYPES_PATH)
+        remote_url = "https://example.com/whitepaper.pdf"
+        fake_temp = Path("/tmp/fake-downloaded.pdf")
+        document_result = fetch_result_module.FetchResult(
+            markdown="# Whitepaper\nbody",
+            title="Whitepaper",
+            meta={"file_size_bytes": 1234},
+            source_type="doc_pdf",
+            url_or_path=str(fake_temp),
+            success=True,
+            error=None,
         )
+        unlink_calls: list[bool] = []
+
+        def fake_unlink(self, missing_ok: bool = False) -> None:  # noqa: ARG001
+            unlink_calls.append(True)
+
+        with patch.object(module, "_download_remote_document", return_value=fake_temp) as download_mock, patch.object(
+            module._document_fetcher, "fetch", return_value=document_result
+        ) as document_mock, patch.object(Path, "unlink", fake_unlink):
+            result = module.dispatch(remote_url)
+
+        download_mock.assert_called_once_with(remote_url, ".pdf")
+        document_mock.assert_called_once_with(str(fake_temp))
+        self.assertTrue(result.success)
+        self.assertEqual(result.source_type, "doc_pdf")
+        self.assertEqual(result.url_or_path, remote_url)
+        self.assertEqual(result.meta.get("remote_source_url"), remote_url)
+        self.assertEqual(result.meta.get("downloaded_to"), str(fake_temp))
+        self.assertTrue(unlink_calls, "临时文件必须被清理")
 
     def test_dispatch_falls_back_from_article_to_archive(self) -> None:
         module = load_dispatcher_module()
