@@ -193,7 +193,7 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 ### P2-B: xhs_product Fetcher + dispatcher 扩展
 - 目标：识别 xhslink 短链 + 调 playwright-stealth 抓商品/店铺/主页页面
 - 涉及文件：`skills/lark-knowledge-intake/xhs_product.py`（新建）、`skills/lark-knowledge-intake/dispatcher.py`（新建顶层分发器）
-- 状态：✅ 已完成（commit 待补）
+- 状态：✅ 已完成（commit `9c218b2`）
 
 ### P2-C: Intake 5维分析框架（全库通用）
 - 目标：所有内容 AI摘要 通过5维框架撰写，不限专题
