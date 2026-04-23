@@ -47,11 +47,13 @@ lark-cli docs +fetch --doc "<url_or_token>" --format markdown
 
 **微信公众号文章**（`mp.weixin.qq.com`）：
 
-两条路径：
+三层降级路径：
 
-A. **自动抓取（推荐，需首次扫码）**：运行 `python -m fetchers.wechat --login`，在弹出浏览器里扫码一次。登录态保存到 `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`（仅本机使用，不入仓）。cookie 过期时重跑 `--login`。
+A. **Jina Reader（推荐，零配置无封号风险）**：用 WebFetch 请求 `https://r.jina.ai/` + 原始 URL，Jina 服务器端渲染后返回干净 Markdown，大多数公开文章可直接获取。
 
-B. **手动兜底（未配置 Playwright 或自动抓取失败时）**：
+B. **扫码抓取（Jina 失败时）**：运行 `python -m fetchers.wechat --login`，在弹出浏览器里扫码一次。登录态保存到 `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`（仅本机使用，不入仓）。cookie 过期时重跑 `--login`。
+
+C. **手动兜底（以上均失败时）**：
 > "微信文章无法自动读取，请选择：
 > A. 在手机微信中打开 → 右上角… → 打印 → 存为 PDF → 发给我
 > B. 复制全文粘贴过来"
@@ -63,7 +65,11 @@ B. **手动兜底（未配置 Playwright 或自动抓取失败时）**：
 - 首次真实使用前需先安装 OpenCLI 的 Chrome Browser Bridge 扩展，并安装 Node.js CLI。
 - 将 OpenCLI 绝对路径写入 `~/.claude/skills/lark-knowledge-intake/.local/opencli_config/opencli_path`。
 
-**其他网页 URL**：使用 WebFetch 工具。
+**其他网页 URL**：按三层降级处理：
+
+1. **WebFetch**（最快）→ 正文完整则直接用
+2. **Jina Reader**（WebFetch 正文不完整/乱码时）→ WebFetch 请求 `https://r.jina.ai/` + 原始 URL
+3. **Playwright Stealth**（Jina 也失败时）→ 适用于有反爬保护的页面
 
 **洞察归档**（当前会话产生的总结/提炼结论）：
 
