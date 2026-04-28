@@ -2,8 +2,8 @@
 """
 All In Podcast 精选 Top20 自动维护脚本
 
-算法：综合得分 = YouTube播放量 × 0.4 + 五维综合评分 × 0.6
-      (播放量已由飞书公式字段「综合得分（算法）」自动计算)
+算法：综合得分 = (YouTube播放量 ÷ 10000) × 0.4 + 五维综合评分 × 0.6
+      (已由飞书公式字段「综合得分（算法）」自动计算，结果约在 10–50 之间)
 
 用法：
     python3 scripts/allin_top20_updater.py [--dry-run]
@@ -109,7 +109,7 @@ def build_top20_markdown(records: list[dict], generated_at: str) -> str:
             "",
         ]
 
-    lines.append(f"*共 {len(top20)} 期 / 候选池 {len(records)} 期 · 算法：播放量×0.4 + 五维评分×0.6*")
+    lines.append(f"*共 {len(top20)} 期 / 候选池 {len(records)} 期 · 算法：(播放量÷万)×0.4 + 五维评分×0.6*")
     return "\n".join(lines)
 
 # ── Step 3：更新「精选必读」wiki 页面 ───────────────────────────────────
