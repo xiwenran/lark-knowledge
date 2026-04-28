@@ -228,8 +228,8 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 **方案文档**：`~/Obsidian/PersonalWiki/方案/all-in-podcast-知识库产品.md`
 
 **飞书基础设施**：
-- Base（节目收件表）：base_token `BUpGbPzJFaAp3ustfdIcr8penJe`，table_id `tblRL4DkyUhp5ieR`
-- Wiki 空间：space_id `7405572495342665731`，根节点 `Wq2JwALP9ilYc4kdGB7c70uuntb`
+- Base（节目收件表）：base_token `<见 config.json>`，table_id `<见 config.json>`
+- Wiki 空间：space_id `<见 config.json>`，根节点 `<见 config.json>`
 - 知识库目录：导航总表 / 精选必读 / 科技&AI / 全球视野 / 金融&市场 / 商业&创业 / 人物专访（各含 2024/2025 子节点）
 - 完整 ID 索引：`memory/reference_allinpodcast_ids.md`
 
