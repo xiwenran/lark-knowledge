@@ -266,10 +266,12 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 - 目标：用 Kami（HTML/CSS）生成可打印 PDF，主副式双语，霞鹜文楷，天蓝色 #4DABF7
 - 涉及文件：新建 `templates/allin-kami/` 目录（HTML + CSS 模板）
 - 验收：1 期 PDF 导出，双语对照排版，可在 Kami 中标注
-- 状态：🚧 进行中
+- 状态：✅ 已完成（commit `427683a`，2026-04-28）
+  - `templates/allin-kami/styles.css`：霞鹜文楷 + #4DABF7 天蓝色全套样式
+  - `templates/allin-kami/episode.html`：封面/概览/五维/金句/逐字稿完整模板，注释版删 .annotation 块即得原稿版
 
 ### P3-F: 精选 Top20 自动维护
 - 目标：每月由 AI 根据「播放量×0.4 + 五维评分×0.6」算法自动更新「精选必读」页面
 - 涉及文件：`scripts/allin_top20_updater.py`（新建）
 - 验收：脚本跑通，精选必读页面内容自动刷新
-- 状态：⏸ 待 P3-B 积累足够数据后启动
+- 状态：🚧 进行中（脚本可先写，数据积累后再首跑验收）
