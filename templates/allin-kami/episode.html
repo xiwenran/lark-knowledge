@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{EPISODE_NUM}} · {{TITLE_ZH}} — All In 中文知识库</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ═══════════════ 封面 ═══════════════ -->
+<div class="cover page-break">
+  <div class="cover-series">All In Podcast 中文知识库</div>
+  <div class="cover-episode">{{EPISODE_NUM}} · {{PUBLISH_DATE}}</div>
+  <div class="cover-title">{{TITLE_ZH}}</div>
+  <div class="cover-divider"></div>
+  <div class="cover-meta">
+    时长：{{DURATION}}分钟 &nbsp;·&nbsp; 播放量：{{VIEWS}}万<br>
+    主题：{{TOPIC_TAG}}
+  </div>
+</div>
+
+<!-- ═══════════════ 核心概览 ═══════════════ -->
+<div class="content">
+  <div class="page-header">
+    <span class="series">All In 中文知识库</span>
+    <span>{{EPISODE_NUM}} · {{TITLE_ZH}}</span>
+  </div>
+
+  <div class="overview-block">
+    <p><span class="label">议题：</span>{{OVERVIEW_TOPIC}}</p>
+    <p><span class="label">关键判断：</span>{{OVERVIEW_KEY}}</p>
+    <p><span class="label">国内启示：</span>{{OVERVIEW_CN}}</p>
+  </div>
+
+  <hr class="section-rule">
+
+  <!-- ═══════════════ 五维分析 ═══════════════ -->
+  <div class="analysis-heading">五维分析</div>
+
+  <div class="no-break">
+    <div class="analysis-sub">一、本期议题</div>
+    <p>{{ANALYSIS_1}}</p>
+  </div>
+
+  <div class="no-break">
+    <div class="analysis-sub">二、核心论点链</div>
+    <p>{{ANALYSIS_2}}</p>
+  </div>
+
+  <div class="no-break">
+    <div class="analysis-sub">三、市场与行业判断</div>
+    <p>{{ANALYSIS_3}}</p>
+  </div>
+
+  <div class="no-break">
+    <div class="analysis-sub">四、四人立场图谱</div>
+    <p>{{ANALYSIS_4}}</p>
+  </div>
+
+  <div class="no-break">
+    <div class="analysis-sub">五、国内启示</div>
+    <p>{{ANALYSIS_5}}</p>
+  </div>
+
+  <hr class="section-rule">
+
+  <!-- ═══════════════ 精华金句 ═══════════════ -->
+  <div class="analysis-heading">精华金句</div>
+
+  <!-- 复制以下块 3-5 次 -->
+  <div class="quote-block no-break">
+    <div class="quote-en">"{{QUOTE_EN_1}}"</div>
+    <div class="quote-zh">{{QUOTE_ZH_1}}</div>
+    <div class="quote-speaker">— {{QUOTE_SPEAKER_1}}</div>
+  </div>
+
+  <div class="quote-block no-break">
+    <div class="quote-en">"{{QUOTE_EN_2}}"</div>
+    <div class="quote-zh">{{QUOTE_ZH_2}}</div>
+    <div class="quote-speaker">— {{QUOTE_SPEAKER_2}}</div>
+  </div>
+
+  <div class="quote-block no-break">
+    <div class="quote-en">"{{QUOTE_EN_3}}"</div>
+    <div class="quote-zh">{{QUOTE_ZH_3}}</div>
+    <div class="quote-speaker">— {{QUOTE_SPEAKER_3}}</div>
+  </div>
+
+  <hr class="section-rule page-break">
+
+  <!-- ═══════════════ 中英对照逐字稿 ═══════════════ -->
+  <div class="page-header">
+    <span class="series">All In 中文知识库</span>
+    <span>{{EPISODE_NUM}} · 逐字稿</span>
+  </div>
+
+  <div class="analysis-heading">中英对照逐字稿</div>
+
+  <!--
+    以下为逐字稿内容区。
+    每个时间段按如下结构重复：
+
+    <div class="no-break">
+      <div class="chapter-heading">[00:00–12:30] 章节主题</div>
+    </div>
+
+    <p class="zh-para"><span class="speaker">Chamath：</span>中文翻译内容...</p>
+    <p class="zh-para">继续翻译...</p>
+
+    [如有实质洞察才加注释块，否则省略]
+    <div class="annotation no-break">
+      注释内容，自然散文风格，1-3 句话。
+    </div>
+
+    <span class="en-text">Original English transcript text here...</span>
+
+    注意：
+    - 原稿版 PDF：删除所有 <div class="annotation"> 块
+    - 注释版 PDF：保留所有 <div class="annotation"> 块
+    - 每个时间段的 en-text 放在中文段落之后（含注释之后）
+  -->
+
+  <!-- 示例段落（生产时替换） -->
+  <div class="no-break">
+    <div class="chapter-heading">[{{TIME_START_1}}–{{TIME_END_1}}] {{CHAPTER_TITLE_1}}</div>
+  </div>
+
+  <p class="zh-para"><span class="speaker">{{SPEAKER_1}}：</span>{{ZH_CONTENT_1}}</p>
+
+  <!-- 注释版专用：有洞察时加 annotation，原稿版删除此块 -->
+  <div class="annotation no-break">{{ANNOTATION_1}}</div>
+
+  <span class="en-text">{{EN_CONTENT_1}}</span>
+
+  <hr class="section-rule">
+
+  <!-- 封底 -->
+  <div class="back-cover">
+    <p class="series-intro">
+      All In 中文知识库收录 All In Podcast 精选期节，提供中英对照逐字稿与五维深度分析。<br>
+      所有内容仅供学习参考，版权归原作者所有。
+    </p>
+    <div class="xhs-cta">小红书搜索：All In 中文知识库</div>
+  </div>
+
+  <div class="page-footer">
+    <span>第 <span class="page-num"></span> 页</span>
+  </div>
+
+</div><!-- .content -->
+
+</body>
+</html>

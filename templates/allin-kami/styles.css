@@ -1,0 +1,297 @@
+/* ================================================
+   All In Podcast 中文知识库 — Kami PDF 排版样式
+   版本：1.0.0 | 字体：霞鹜文楷 | 主色：#4DABF7
+   ================================================ */
+
+@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
+
+/* ── 基础重置 ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── 全局字体 & 颜色变量 ── */
+:root {
+  --sky-blue:   #4DABF7;
+  --sky-light:  #E8F4FD;
+  --text-main:  #1A1A1A;
+  --text-en:    #888888;
+  --text-note:  #555555;
+  --rule-color: #D0E8F8;
+  --font-main:  'LXGW WenKai', 'LXGWWenKai', serif;
+  --font-size-main: 16px;
+  --font-size-en:   13px;
+  --line-height:    1.9;
+  --page-width:     800px;
+  --page-padding:   48px 56px;
+}
+
+body {
+  font-family: var(--font-main);
+  font-size: var(--font-size-main);
+  color: var(--text-main);
+  line-height: var(--line-height);
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 0;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── 分页控制 ── */
+@media print {
+  body { max-width: 100%; }
+  .page-break { page-break-after: always; }
+  .no-break    { page-break-inside: avoid; }
+  h2, h3       { page-break-after: avoid; }
+}
+
+/* ═══════════════════════════════════════
+   封面页
+═══════════════════════════════════════ */
+.cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 80px 56px;
+  border-top: 6px solid var(--sky-blue);
+}
+
+.cover-series {
+  font-size: 13px;
+  color: var(--sky-blue);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.cover-episode {
+  font-size: 15px;
+  color: var(--text-en);
+  margin-bottom: 12px;
+}
+
+.cover-title {
+  font-size: 34px;
+  font-weight: bold;
+  color: var(--text-main);
+  line-height: 1.4;
+  margin-bottom: 32px;
+}
+
+.cover-meta {
+  font-size: 13px;
+  color: var(--text-en);
+  line-height: 2;
+}
+
+.cover-divider {
+  width: 60px;
+  height: 3px;
+  background: var(--sky-blue);
+  margin: 28px 0;
+}
+
+/* ═══════════════════════════════════════
+   页眉 / 页脚
+═══════════════════════════════════════ */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--rule-color);
+  font-size: 11px;
+  color: var(--text-en);
+  margin-bottom: 32px;
+}
+
+.page-header .series { color: var(--sky-blue); }
+
+.page-footer {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+  border-top: 1px solid var(--rule-color);
+  font-size: 11px;
+  color: var(--text-en);
+  margin-top: 40px;
+}
+
+/* ═══════════════════════════════════════
+   主内容区
+═══════════════════════════════════════ */
+.content {
+  padding: var(--page-padding);
+}
+
+/* ── 章节分隔线 ── */
+.section-rule {
+  border: none;
+  border-top: 1px solid var(--rule-color);
+  margin: 36px 0;
+}
+
+/* ── 章节标题（时间段 + 主题）── */
+.chapter-heading {
+  color: var(--sky-blue);
+  font-size: 15px;
+  font-weight: bold;
+  margin: 40px 0 16px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--sky-light);
+}
+
+/* ── 中文段落 ── */
+.zh-para {
+  margin-bottom: 10px;
+  text-indent: 2em;
+}
+
+/* ── 英文原文 ── */
+.en-text {
+  display: block;
+  font-size: var(--font-size-en);
+  color: var(--text-en);
+  line-height: 1.7;
+  margin: 8px 0 16px;
+  padding-left: 1em;
+  border-left: 2px solid var(--rule-color);
+}
+
+.en-text::before {
+  content: "EN: ";
+  font-weight: bold;
+  color: #aaa;
+}
+
+/* ── 注释块 ── */
+.annotation {
+  background: var(--sky-light);
+  border-left: 3px solid var(--sky-blue);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 10px 0 18px;
+  font-size: 14px;
+  color: var(--text-note);
+  line-height: 1.8;
+}
+
+/* ── 核心概览块（黄色）── */
+.overview-block {
+  background: #FFFBEC;
+  border-left: 3px solid #F5C842;
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 20px 0;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.overview-block .label {
+  font-weight: bold;
+  color: #B8860B;
+  margin-right: 6px;
+}
+
+/* ── 五维分析章节标题 ── */
+.analysis-heading {
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--text-main);
+  margin: 32px 0 12px;
+}
+
+.analysis-sub {
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--sky-blue);
+  margin: 20px 0 8px;
+}
+
+/* ── 精华金句 ── */
+.quote-block {
+  border-left: 3px solid var(--sky-blue);
+  padding: 10px 16px;
+  margin: 14px 0;
+  background: #F8FBFF;
+}
+
+.quote-en {
+  font-size: 14px;
+  color: var(--text-main);
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+.quote-zh {
+  font-size: 13px;
+  color: var(--text-en);
+}
+
+.quote-speaker {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* ── 说话人标注 ── */
+.speaker {
+  font-weight: bold;
+  color: var(--text-main);
+}
+
+/* ── 信息标签栏（期号/日期/时长等）── */
+.episode-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-en);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rule-color);
+}
+
+.episode-meta-bar .tag {
+  background: var(--sky-light);
+  color: var(--sky-blue);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* ═══════════════════════════════════════
+   封底页
+═══════════════════════════════════════ */
+.back-cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 60px 56px;
+  border-top: 6px solid var(--sky-blue);
+  margin-top: 40px;
+}
+
+.back-cover .series-intro {
+  font-size: 14px;
+  color: var(--text-note);
+  line-height: 2;
+  max-width: 480px;
+  margin-bottom: 32px;
+}
+
+.back-cover .xhs-cta {
+  font-size: 14px;
+  color: var(--sky-blue);
+  border: 1px solid var(--sky-blue);
+  padding: 8px 24px;
+  border-radius: 20px;
+}
