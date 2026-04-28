@@ -1,5 +1,6 @@
 # 敏感信息
 config.json
+memory/
 *.token
 *.secret
 .env
