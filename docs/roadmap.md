@@ -252,7 +252,7 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 - 涉及文件：新建 `skills/lark-knowledge-allin-transcript/SKILL.md`
 - 排版规则：天蓝色标题、灰色 EN: 前缀、light-blue callout 作注释（有实质洞察才写）
 - 验收：1 期逐字稿完整写入飞书页面，格式符合方案文档规范
-- 状态：⏸ 待 P3-B 完成后启动
+- 状态：✅ 已完成（commit 待补，2026-04-28）
 
 ### P3-D: All In 注释版生成（内联注释 + 五维分析章节）
 - 目标：在逐字稿基础上，由 AI 添加内联注释 callout + 独立五维分析章节
