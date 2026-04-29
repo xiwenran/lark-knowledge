@@ -262,13 +262,15 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 - 状态：✅ 已合并进 P3-C（commit `4f51a00`，2026-04-28）
   - P3-C skill 的 Step 4（Writer 添加注释）和 Step 5B（独立五维章节）已覆盖本期全部内容
 
-### P3-E: Kami PDF 排版模板
+### P3-E: Kami PDF 排版模板 + 自动化脚本
 - 目标：用 Kami（HTML/CSS）生成可打印 PDF，主副式双语，霞鹜文楷，天蓝色 #4DABF7
-- 涉及文件：新建 `templates/allin-kami/` 目录（HTML + CSS 模板）
+- 涉及文件：`templates/allin-kami/`、`scripts/allin/generate_pdf.py`
 - 验收：1 期 PDF 导出，双语对照排版，可在 Kami 中标注
-- 状态：✅ 已完成（commit `427683a`，2026-04-28）
+- 状态：✅ 已完成（模板 commit `427683a`，自动化脚本 2026-04-29）
   - `templates/allin-kami/styles.css`：霞鹜文楷 + #4DABF7 天蓝色全套样式
-  - `templates/allin-kami/episode.html`：封面/概览/五维/金句/逐字稿完整模板，注释版删 .annotation 块即得原稿版
+  - `templates/allin-kami/episode.html`：封面/概览/五维/金句/逐字稿完整模板
+  - `scripts/allin/generate_pdf.py`：读 bilingual.json + analysis.json，Chrome headless 生成 PDF
+  - 同时输出注释版（annotated）和原稿版（original）两份
 
 ### P3-F: 精选 Top20 自动维护
 - 目标：每月由 AI 根据「播放量×0.4 + 五维评分×0.6」算法自动更新「精选必读」页面
