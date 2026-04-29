@@ -234,48 +234,22 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 
 ---
 
-### 🤖 Step 8：排版美化（分区处理）
+### 🤖 Step 8：排版美化
 
-> 完整排版规则见 `../lark-knowledge-format/SKILL.md`（模式 2 引用）
+**引用** `../lark-knowledge-format/SKILL.md` 模式 2（规则层复用），按其完整规范执行。
 
-写入飞书后，对页面进行区域化排版：
+**All In 页面三条专属覆盖规则**（优先级高于 format skill 通用规则）：
 
-#### 排版分区规则（All In 专用）
+1. **逐字稿区域禁止着色**：`## <text color="blue">中英对照逐字稿</text>` 之后的所有内容**原封不动**，一个 `<text color>` 都不加。双语逐句体裁加颜色会变乱。
+2. **排版范围**：只处理页面头部 + 五维分析 + 精华金句三个区域，其余区域（callout 概览块、注释 callout、手绘笔记占位）保持原样。
+3. **精华金句**：引用块加 `light-purple` 背景，说话人名用 `blue`，引号内关键词用 `red`。
 
-| 区域 | 排版策略 | 原因 |
-|------|---------|------|
-| 页面头部一句话摘要 | 正常着色（公司名 blue、数字 red） | 引流入口，需视觉冲击 |
-| light-yellow 概览 callout | 保持原样，不改 | callout 背景已足够 |
-| 五维分析各节 | **重点着色**（数字 red、公司人名 blue、判断词 green/red） | 分析类内容，颜色增强可读性 |
-| 精华金句 | 金句引用块整体 `light-purple` 背景，说话人名 blue | 金句要突出，有格调 |
-| **逐字稿区域** | **❌ 禁止添加任何 `<text color>` 着色** | 双语逐句体裁，加颜色变花哨乱 |
-| 注释 callout | 保持 light-blue 原样，不改 | 已格式化 |
-
-#### 五维分析着色规则
-
-```
-数字/金额/比例/量级   → <text color="red">$140B</text>
-公司名/产品名         → <text color="blue">Salesforce（赛富时）</text>
-主播人名              → <text color="blue">Chamath</text>
-积极判断词            → <text color="green">显著改善</text>
-风险/警告词           → <text color="red">债务炸弹</text>
-核心结论句            → <text color="red" background-color="light-red">最强洞察</text>
-专业术语首次出现      → <text background-color="light-yellow">自由现金流</text>
-```
-
-#### 执行方式
-
+执行：
 ```bash
-# 1. 读取页面
-lark-cli docs +fetch --doc <wiki_url>
-
-# 2. 按分区规则重写（只处理五维+金句+头部，逐字稿段跳过）
-
-# 3. 写回
+lark-cli docs +fetch --doc <wiki_url>          # 读取
+# 按上方三条 + format skill 规则重写（逐字稿段直接复制不改）
 lark-cli docs +update --doc <wiki_url> --mode overwrite --markdown "<排版后内容>"
 ```
-
-**注意**：逐字稿段（`## <text color="blue">中英对照逐字稿</text>` 之后的所有内容）**原封不动复制**，一个字符都不改。
 
 ---
 
