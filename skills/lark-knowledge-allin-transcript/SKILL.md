@@ -1,7 +1,7 @@
 ---
 name: lark-knowledge-allin-transcript
-version: 2.1.0
-description: "All In Podcast 逐字稿生成：说一句话全自动完成。触发词：allin逐字稿、生成逐字稿、allin转写、allin建页。用法：allin逐字稿 <YouTube_URL> <record_id>"
+version: 2.2.0
+description: "All In Podcast 逐字稿生成：说一句话全自动完成，含翻译+AI分析+排版美化。触发词：allin逐字稿、生成逐字稿、allin转写、allin建页。用法：allin逐字稿 <YouTube_URL> <record_id>"
 metadata:
   requires:
     bins: ["lark-cli", "yt-dlp", "python3"]
@@ -231,6 +231,51 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 ## 精华金句
 ## 中英对照逐字稿
 ```
+
+---
+
+### 🤖 Step 8：排版美化（分区处理）
+
+> 完整排版规则见 `../lark-knowledge-format/SKILL.md`（模式 2 引用）
+
+写入飞书后，对页面进行区域化排版：
+
+#### 排版分区规则（All In 专用）
+
+| 区域 | 排版策略 | 原因 |
+|------|---------|------|
+| 页面头部一句话摘要 | 正常着色（公司名 blue、数字 red） | 引流入口，需视觉冲击 |
+| light-yellow 概览 callout | 保持原样，不改 | callout 背景已足够 |
+| 五维分析各节 | **重点着色**（数字 red、公司人名 blue、判断词 green/red） | 分析类内容，颜色增强可读性 |
+| 精华金句 | 金句引用块整体 `light-purple` 背景，说话人名 blue | 金句要突出，有格调 |
+| **逐字稿区域** | **❌ 禁止添加任何 `<text color>` 着色** | 双语逐句体裁，加颜色变花哨乱 |
+| 注释 callout | 保持 light-blue 原样，不改 | 已格式化 |
+
+#### 五维分析着色规则
+
+```
+数字/金额/比例/量级   → <text color="red">$140B</text>
+公司名/产品名         → <text color="blue">Salesforce（赛富时）</text>
+主播人名              → <text color="blue">Chamath</text>
+积极判断词            → <text color="green">显著改善</text>
+风险/警告词           → <text color="red">债务炸弹</text>
+核心结论句            → <text color="red" background-color="light-red">最强洞察</text>
+专业术语首次出现      → <text background-color="light-yellow">自由现金流</text>
+```
+
+#### 执行方式
+
+```bash
+# 1. 读取页面
+lark-cli docs +fetch --doc <wiki_url>
+
+# 2. 按分区规则重写（只处理五维+金句+头部，逐字稿段跳过）
+
+# 3. 写回
+lark-cli docs +update --doc <wiki_url> --mode overwrite --markdown "<排版后内容>"
+```
+
+**注意**：逐字稿段（`## <text color="blue">中英对照逐字稿</text>` 之后的所有内容）**原封不动复制**，一个字符都不改。
 
 ---
 
