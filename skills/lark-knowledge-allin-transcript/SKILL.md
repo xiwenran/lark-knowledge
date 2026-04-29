@@ -1,45 +1,72 @@
 ---
 name: lark-knowledge-allin-transcript
-version: 1.0.0
-description: "All In Podcast 逐字稿生成：将 YouTube 字幕翻译为中英对照格式，含嵌入式注释，按 All In 专用排版规范写入飞书知识库页面。触发词：allin逐字稿、生成逐字稿、allin转写、allin建页。"
+version: 2.0.0
+description: "All In Podcast 逐字稿生成：多模型分工流水线，Doubao翻译+Haiku核查+Sonnet注释+Opus异常检测，写入飞书知识库页面。触发词：allin逐字稿、生成逐字稿、allin转写、allin建页。"
 metadata:
   requires:
-    bins: ["lark-cli"]
+    bins: ["lark-cli", "yt-dlp", "python3"]
+    pip: ["openai", "anthropic"]
+    scripts:
+      - scripts/allin/vtt_clean.py
+      - scripts/allin/translate_bilingual.py
+      - scripts/allin/build_feishu_page.py
+      - scripts/allin/run_episode.sh
+    env:
+      - ARK_API_KEY  # 火山引擎 API Key
 ---
 
-# All In Podcast 逐字稿生成
+# All In Podcast 逐字稿生成 v2.0
 
-**CRITICAL — 开始前 MUST 先用 Read 工具读取：**
-1. `~/.agents/skills/lark-knowledge-config/config.json` → 读 `all_in_podcast` 区块，获取 base_token、table_id、wiki directories 字段
+**CRITICAL — 开始前 MUST 先读取：**
+1. `~/.agents/skills/lark-knowledge-config/config.json` → 读 `all_in_podcast` 区块
 2. `../lark-shared/SKILL.md` — 认证、权限处理
 
-## 适用场景
-
-已完成 P3-B 收件（收件表里有对应记录）后，生成该期的完整飞书知识库页面：
-- 中英对照逐字稿（全文翻译）
-- 嵌入式注释（有实质洞察处才写）
-- 完整页面结构（顶部信息块 + 五维分析 + 精华金句 + 逐字稿）
-
 ---
 
-## 输入
+## 一键运行（推荐）
 
-用户提供**以下任一**：
-- 收件表 record_id（P3-B 写入后返回的 ID）
-- YouTube URL（skill 自行从收件表查找对应记录）
-- 期号（如 E327）
-
----
-
-## 工作流
-
-```
-读取收件表记录 → 获取完整字幕 → 分章节翻译（Worker）→ 添加注释（Writer）→ 组装页面 → 写入 Wiki → 更新收件表
+```bash
+export ARK_API_KEY=<火山引擎APIKey>
+cd ~/lark-knowledge
+bash scripts/allin/run_episode.sh <YouTube_URL> <record_id>
 ```
 
+可选参数：
+- `--skip-checks`：跳过 Haiku 核查和 Opus 异常检测（调试用）
+- `--dry-run`：只生成预览 Markdown，不写入飞书
+- `SEGMENT_MINUTES=20`：调整分段时长（默认 15 分钟）
+
 ---
 
-## Step 1: 读取收件表记录
+## 模型分工与质量合同
+
+### 各模型职责
+
+| 角色 | 模型 | 职责 |
+|------|------|------|
+| 翻译 Worker | **Doubao-Seed-2.0-pro**（火山引擎） | 字幕全文逐句翻译，成本约为 Claude 的 1/10 |
+| 事实校对 | **Claude Haiku** | 核查数字/人名/归属，输出中文异常报告 |
+| 内容生产 | **Claude Sonnet** | 注释生成 + 五维分析 + 精华金句 |
+| 异常检测 | **Claude Opus** | 世界知识核验 + 内部一致性检查 |
+
+### 各角色权力边界（严格遵守）
+
+- **Doubao**：只翻译，不分析，不判断重要性
+- **Haiku**：只能标 ❓，不能改内容，只做机械比对
+- **Sonnet**：定稿权，但必须回应每个 Haiku 的 ❓
+- **Opus**：只输出 ⚠️ 或 ✅，不推翻 Sonnet 的风格判断，只纠事实错误
+
+### 可验证事实标准（Haiku 执行）
+
+- 数字：必须能在字幕原文找到出处，否则标 ❓
+- 人名归属：Jason 说的 ≠ Chamath 说的，错了就是错了
+- 公司名：英文原名保留，括号加中文（如 `Salesforce（赛富时）`）
+
+---
+
+## 手动分步操作
+
+### Step 1：读取收件表记录
 
 ```bash
 lark-cli base +record-get \
@@ -48,290 +75,183 @@ lark-cli base +record-get \
   --record-id "<record_id>"
 ```
 
-从记录中提取（后续步骤使用）：
-- 期号、英文原标题、中文标题
-- 发布日期（用于确定年份节点）
-- YouTube链接
-- 主题分类（用于确定 wiki 目录节点）
-- 五维综合评分的完整五维分析文本（P3-B 写入的 AI摘要字段中）
-- 精华金句（P3-B 的审核备注字段，若有记录）
+提取：期号、中文标题、发布日期、YouTube链接、主题分类、五维分析（AI摘要字段）。
 
 ---
 
-## Step 2: 获取完整字幕
+### Step 2：下载并清洗字幕
 
-### 2A. yt-dlp 下载英文字幕
+#### 2A. 下载字幕
 
 ```bash
 yt-dlp --write-auto-sub --sub-lang en --sub-format vtt --skip-download \
-  --output "/tmp/allin_%(id)s" "<YouTube URL>"
+  --output "/tmp/allin_<ID>" "<YouTube URL>"
 ```
 
-字幕文件路径：`/tmp/allin_<视频ID>.en.vtt`
-
-### 2B. 清理 vtt 格式，获得纯文本
+#### 2B. 清洗 VTT → 分段 JSON
 
 ```bash
-# 去掉时间码和 WEBVTT 头，合并为连续文本
-python3 -c "
-import re, sys
-content = open(sys.argv[1]).read()
-# 去时间码行
-content = re.sub(r'\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}.*\n', '', content)
-# 去 WEBVTT 和空行序号
-content = re.sub(r'WEBVTT\n', '', content)
-content = re.sub(r'^\d+\$', '', content, flags=re.MULTILINE)
-# 合并空行
-content = re.sub(r'\n{3,}', '\n\n', content)
-print(content.strip())
-" /tmp/allin_<视频ID>.en.vtt > /tmp/allin_<视频ID>_clean.txt
+python3 scripts/allin/vtt_clean.py \
+  /tmp/allin_<ID>.en.vtt \
+  /tmp/allin_<ID>_segments.json \
+  --segment-minutes 15
 ```
 
-### 2C. 将全文按时间分段（约 10-15 分钟一段）
-
-All In 单期 60-120 分钟，约 15000-30000 词，**必须分段处理**，否则单次 prompt 超限。
-
-分段原则：
-- 保留 vtt 时间码信息，每段约 10-15 分钟
-- 按话题转换点切割（看时间码密度变化）
-- 每段约 2000-4000 词
-
-**输出**：`[{"time": "00:00–12:30", "text": "...原文..."}, ...]` 格式的分段列表
+输出：`segments.json`，格式为 `[{index, time_label, sentences: [{time_start, text, speaker_change}]}]`
 
 ---
 
-## Step 3: Worker — 逐段翻译（Sonnet 4.6 子代理）
+### Step 3：Doubao 翻译（逐句双语）
 
-**处理方式**：每段独立翻译，可并行处理（段间无依赖）。
-
-**翻译规则**：
-
-1. **逐段翻译，不压缩**：忠实原意，保留所有细节，不摘要、不删减
-2. **说话人标注**：当能识别说话人时，在段落开头加 `**Chamath**：` / `**Jason**：` / `**Sacks**：` / `**Friedberg**：`；混杂难辨时可省略
-3. **专有名词保留**：公司名、产品名、人名用原文；数字保留英文原始数字
-4. **口语化翻译**：All In 是对谈节目，翻译要有口语感，不要文绉绉
-
-**每段翻译输出格式**：
-
-```
-**[00:00–12:30] <章节主题（AI 概括）>**
-
-中文翻译段落……（说话人对话按自然段落分隔）
-
-<text color="grey">EN: Original transcript text here, as faithful as possible to the original, preserving speaker turns...</text>
+```bash
+export ARK_API_KEY=<火山引擎APIKey>
+python3 scripts/allin/translate_bilingual.py \
+  /tmp/allin_<ID>_segments.json \
+  /tmp/allin_<ID>_bilingual.json
 ```
 
-> 每个时间段对应一个中文翻译块 + 一个 `<text color="grey">EN: ...</text>` 块。
-> EN 块不换行（整个时间段的英文原文放在一个 grey text 标签里）。
+**支持断点续传**：中断后加 `--start-from N` 从第 N 段继续。
+
+**翻译输出格式**（每句）：
+```
+> Jason: 英文原句
+**Jason**：中文翻译
+```
+
+**翻译原则**：
+- 保持口语感，像真人在说话
+- 公司名/产品名保留英文，括号加中文
+- 金融/科技专业术语必须准确
+- 数字保留英文原始格式（`$140B`不改成"1400亿"）
 
 ---
 
-## Step 4: Writer — 嵌入注释（Sonnet 4.6 子代理）
+### Step 4：Haiku 事实核查
 
-**任务**：在 Step 3 的翻译稿基础上，**仅在有实质洞察处**插入 light-blue callout 注释。
+`build_feishu_page.py` 内置，自动执行。也可单独触发：
 
-### 注释触发标准（必须满足至少一条才写注释）
+核查范围：
+- 所有包含数字、$、% 的英文原句
+- 与已知四位主播立场有明显矛盾的表述
+- 说话人归属（基于上下文判断）
 
-- 出现了普通读者不熟悉的背景信息（公司历史、人物关系、行业术语）
-- 四人的判断与中国市场有直接可迁移的类比
-- 数据或论断需要背景补充才能理解意义
-- 四人之间有明显分歧，值得单独点出
-
-### 注释禁止事项
-
-- ❌ 不写「以上是 XX 对 YY 的看法」等纯转述
-- ❌ 不在政治敏感内容处做倾向性解读（只说「影响 XX 板块」）
-- ❌ 每段不超过 1-2 条注释（宁缺勿滥）
-- ❌ 逐字稿区域禁止着色词（不用 `<text color="red">` 等）
-
-### 注释插入位置
-
-注释 callout 紧跟对应中文段落之后、EN 块之前：
-
+**输出**：中文异常报告，供用户决策：
 ```
-中文翻译段落……
-
-<callout background-color="light-blue">注释内容，自然散文风格，1-3 句话。可以正常换行。</callout>
-
-<text color="grey">EN: Original text...</text>
-```
-
-若该段无注释价值，直接跳过，格式为：
-
-```
-中文翻译段落……
-
-<text color="grey">EN: Original text...</text>
+⚠️ 发现 N 处需确认：
+① [时间] 问题描述 → 建议操作
 ```
 
 ---
 
-## Step 5: 组装完整页面
+### Step 5：Sonnet 注释 + 五维分析 + 金句
 
-### 5A. 确定 Wiki 目录节点
+自动执行。基于完整中文译文生成：
 
-根据收件表记录的「主题分类」 + 发布日期年份，从 config 中查找对应节点 token：
-
+**精华金句**（3-5条）：
 ```
-config.all_in_podcast.wiki.directories["科技&AI"]["2025"]
+> **"英文原句"**
+> 中文译文 — 说话人
 ```
 
-| 主题分类 | 年份 | config 路径 |
-|---------|------|------------|
-| 科技&AI | 2024 | `directories["科技&AI"]["2024"]` |
-| 科技&AI | 2025 | `directories["科技&AI"]["2025"]` |
-| 全球视野 | 2024 | `directories["全球视野"]["2024"]` |
-| … | … | … |
+**注释标注**（≤15条建议）：
+- 触发条件：普通读者不熟悉的背景 / 中国市场类比 / 数据需背景 / 四人明显分歧
+- 禁止：纯转述、政治倾向性解读、每段超过2条
 
-### 5B. 拼装页面 Markdown
+---
 
-按以下固定结构组装（All In 专用排版规范，与通用知识库规则完全独立）：
+### Step 6：Opus 异常检测
+
+自动执行。评判维度（不依赖英文原文）：
+
+1. **世界知识核验**：四位主播立场与公开记录是否一致
+   - Chamath：批评美联储，支持 AI/科技，批评 ESG
+   - Sacks：关注估值和盈利能力，对监管保持警惕
+   - Jason：乐观主义者，押注成长型公司
+   - Friedberg：数据和科学导向，关注农业/生命科学
+
+2. **内部一致性**：五维分析各维度是否有逻辑矛盾
+
+3. **合理性检查**：数字量级是否异常
+
+**输出**：中文报告，⚠️ 需关注 或 ✅ 通过
+
+---
+
+### Step 7：组装页面 + 写入飞书
+
+```bash
+python3 scripts/allin/build_feishu_page.py \
+  /tmp/allin_<ID>_bilingual.json \
+  --record-id "<record_id>"
+```
+
+---
+
+## 页面格式规范 v2.0
+
+### 逐字稿格式（每个章节）
 
 ```markdown
-<期号> · <发布日期> · <时长>分钟 · 播放量 <播放量（万为单位）> · <主题分类>
+**[HH:MM–HH:MM] 章节主题（AI概括）**
 
----
+> **Jason**: 英文原句
+**Jason**：中文翻译
 
-📌 <一句话定位——基于中文标题+五维分析的核心亮点改写，不超过30字>
+> **Chamath**: 英文原句
+**Chamath**：中文翻译
 
-<callout background-color="light-yellow">
-· 议题：<从五维分析①摘取一句>
-· 关键判断：<从五维分析②摘取最重要的一个论点>
-· 国内启示：<从五维分析⑤摘取一句直接结论>
-</callout>
-
----
-
-## <text color="blue">手绘笔记速览</text>
-
-（待补充）
-
----
-
-## <text color="blue">📥 下载资源</text>
-
-（待补充）
-
----
-
-## <text color="blue">五维分析</text>
-
-### <text color="blue">一、本期议题</text>
-
-<p3-b五维分析①的内容>
-
-### <text color="blue">二、核心论点链</text>
-
-<p3-b五维分析②的内容>
-
-### <text color="blue">三、市场与行业判断</text>
-
-<p3-b五维分析③的内容>
-
-### <text color="blue">四、四人立场图谱</text>
-
-<p3-b五维分析④的内容>
-
-### <text color="blue">五、国内启示</text>
-
-<p3-b五维分析⑤的内容>
-
----
-
-## <text color="blue">精华金句</text>
-
-> **"<英文原句>"**
-> <中文译文> — <说话人>
-
-（3-5 条，来自 P3-B 收件时记录的精华金句）
-
----
-
-## <text color="blue">中英对照逐字稿</text>
-
-<Step 4 产出的完整注释版逐字稿，按时间段顺序拼接>
+<callout background-color="light-blue">注释内容，1-2句，自然散文风格</callout>
 ```
 
-**排版铁律（All In 专用，与通用知识库规则完全独立）**：
+### 格式铁律
 
-| 规则 | All In 产品执行方式 |
-|------|-------------------|
+| 规则 | 执行方式 |
+|------|---------|
 | 章节标题 | `## <text color="blue">标题</text>` |
-| 英文原文 | `<text color="grey">EN: ...</text>` |
+| 英文原句 | `> **说话人**: 原文`（引用块） |
+| 中文译文 | `**说话人**：译文` |
 | 注释块 | `<callout background-color="light-blue">` 无 emoji 无标题 |
-| 核心概览 | `<callout background-color="light-yellow">` 无 emoji 无标题 |
-| 逐字稿着色词 | **禁止**，逐字稿区域不做关键词着色 |
-| red 标注 | **仅限五维分析**里的关键数字 |
-| 标题层级 | `## `（二级）用于主章节，`### `（三级）用于五维子章节 |
+| 概览块 | `<callout background-color="light-yellow">` |
+| **禁止** | 逐字稿区域不用 `<text color="red/blue/...">` 着色词 |
+| red 着色 | 仅限五维分析里的关键数字 |
 
----
+### 完整页面结构
 
-## Step 6: 写入 Wiki 页面
-
-### 6A. 创建新页面
-
-```bash
-lark-cli docs +create \
-  --wiki-node "<对应目录节点 token>" \
-  --title "E<期号> · <中文标题>" \
-  --markdown "<Step 5B 的完整页面内容>"
 ```
+{期号} · {日期} · {时长}分钟 · 播放量{播放量} · {主题}
 
-返回值中提取 `doc_url`（wiki 页面链接）。
+📌 一句话核心亮点（≤30字）
 
-### 6B. 页面过长时分批写入
+<callout light-yellow>· 议题 · 关键判断 · 国内启示</callout>
 
-All In 逐字稿约 5000-10000 字，超过 `docs +create` 单次限制时：
-
-1. 先用 `+create` 创建页面，写入 Step 5B 中**逐字稿章节以外**的部分（信息块 + 五维分析 + 精华金句）
-2. 再用 `+update --mode append` 追加完整逐字稿：
-
-```bash
-lark-cli docs +update \
-  --doc "<doc_token>" \
-  --mode append \
-  --markdown "<逐字稿完整内容>"
+## 手绘笔记速览
+## 📥 下载资源
+## 五维分析（一至五）
+## 精华金句
+## 中英对照逐字稿
 ```
 
 ---
 
-## Step 7: 更新收件表记录
-
-写入成功后，更新对应记录的状态字段：
+## Step 8：更新收件表
 
 ```bash
 lark-cli base +record-upsert \
   --base-token "<config.all_in_podcast.base_token>" \
   --table-id "<config.all_in_podcast.table_id>" \
   --record-id "<record_id>" \
-  --json '{
-    "飞书页面URL": "<wiki 页面链接>",
-    "翻译状态": "已完成",
-    "注释状态": "已完成"
-  }'
-```
-
----
-
-## Step 8: 完成汇报
-
-```
-逐字稿页面生成完成 ✅
-E<期号> | <中文标题>
-Wiki 页面：<链接>
-字幕段数：<N> 段 | 注释条数：<M> 条
-翻译状态 → 已完成 | 注释状态 → 已完成
+  --json '{"飞书页面URL": "<url>", "翻译状态": "已完成", "注释状态": "已完成"}'
 ```
 
 ---
 
 ## 注意事项
 
-- **字幕无法获取时**：yt-dlp 失败（无自动字幕）→ 告知用户，提供手动上传字幕文件的选项（.vtt/.srt/.txt 均可）
-- **五维分析来源**：优先用收件表里的 AI摘要字段（P3-B 已生成）；若格式不完整，可重新生成
-- **精华金句来源**：优先用收件表审核备注字段；若无，由 Writer 在翻译过程中从原文摘取
-- **注释密度**：整期约 60-120 分钟，全文注释不超过 20 条（平均每 5-10 分钟 1 条）
-- **分段翻译顺序**：可并行翻译不同段落，Writer 添加注释时需按顺序处理（保持前后文一致性）
+- **字幕无法获取**：yt-dlp 失败时告知用户，接受手动上传 .vtt/.srt/.txt
+- **五维分析来源**：优先用收件表 AI摘要字段（P3-B 已生成）
+- **注释密度**：全期不超过 20 条（约每 5 分钟 1 条）
+- **ARK_API_KEY**：火山引擎控制台获取，不要硬编码进脚本
+- **断点续传**：翻译中断后用 `--start-from N` 继续，不用重头来
 
 ---
 
