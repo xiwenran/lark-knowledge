@@ -1,6 +1,6 @@
 ---
 name: lark-knowledge-allin-transcript
-version: 2.2.0
+version: 2.3.0
 description: "All In Podcast 逐字稿生成：说一句话全自动完成，含翻译+AI分析+排版美化。触发词：allin逐字稿、生成逐字稿、allin转写、allin建页。用法：allin逐字稿 <YouTube_URL> <record_id>"
 metadata:
   requires:
@@ -264,6 +264,35 @@ python3 ~/lark-knowledge/scripts/allin/generate_pdf.py \
 可选参数：
 - `--html-only`：只生成 HTML，用于浏览器手动打印（Chrome 未安装时）
 - `--annotated-only` / `--original-only`：只生成其中一版
+
+---
+
+### 🤖 Step 10：生成手绘笔记
+
+调用 GPT Image 2（支持第三方中转站）批量生成 5-8 张竖版手绘笔记图：
+
+```bash
+export IMAGE_API_KEY=your_key
+export IMAGE_API_BASE=https://your-relay.com/v1   # 第三方中转站
+
+python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
+  --record-id "<record_id>"
+```
+
+输出：`/tmp/allin_<期号>_sketch_01_封面.png` … `_sketch_0N_国内启示.png`
+
+固定结构（来自方案文档第八节）：
+- **第 1 张（封面）**：标题 + 四位主播简笔画 + 关键词气泡
+- **第 2 张（核心议题）**：五维①②提炼的 3 个要点
+- **第 3 张（市场判断）**：五维③，数据高亮框
+- **第 4 张（四人立场）**：四个对话气泡
+- **最后 1 张（国内启示）**：五维⑤ + 精华金句 + 账号水印
+
+调试用（不调 API，只看提示词）：
+```bash
+python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
+  --record-id "<record_id>" --prompts-only
+```
 
 ---
 
