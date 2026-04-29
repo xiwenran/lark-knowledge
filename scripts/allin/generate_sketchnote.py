@@ -39,7 +39,7 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
 DEFAULT_API_BASE = "https://api.vectorengine.cn"
-DEFAULT_MODEL = "gpt-image-1"
+DEFAULT_MODEL = "gpt-image-2"
 
 # ── 风格基底（所有图共用）────────────────────────────────
 STYLE_BASE = (
