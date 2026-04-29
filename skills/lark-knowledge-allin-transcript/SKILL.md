@@ -236,18 +236,12 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 
 ### 🤖 Step 8：排版美化
 
-**引用** `../lark-knowledge-format/SKILL.md` 模式 2（规则层复用），按其完整规范执行。
-
-**All In 页面三条专属覆盖规则**（优先级高于 format skill 通用规则）：
-
-1. **逐字稿区域禁止着色**：`## <text color="blue">中英对照逐字稿</text>` 之后的所有内容**原封不动**，一个 `<text color>` 都不加。双语逐句体裁加颜色会变乱。
-2. **排版范围**：只处理页面头部 + 五维分析 + 精华金句三个区域，其余区域（callout 概览块、注释 callout、手绘笔记占位）保持原样。
-3. **精华金句**：引用块加 `light-purple` 背景，说话人名用 `blue`，引号内关键词用 `red`。
+**引用** `../lark-knowledge-format/SKILL.md` 模式 2，执行 **Step 3.9 All In Podcast 专项排版规则**。
 
 执行：
 ```bash
-lark-cli docs +fetch --doc <wiki_url>          # 读取
-# 按上方三条 + format skill 规则重写（逐字稿段直接复制不改）
+lark-cli docs +fetch --doc <wiki_url>          # 读取页面
+# 按 format skill Step 3.9 规则分区处理（逐字稿段原封不动）
 lark-cli docs +update --doc <wiki_url> --mode overwrite --markdown "<排版后内容>"
 ```
 
