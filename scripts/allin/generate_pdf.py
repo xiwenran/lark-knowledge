@@ -398,6 +398,72 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     return html
 
 
+def upload_pdf_to_drive(config: dict, pdf_path: Path) -> str:
+    """上传 PDF 到飞书云盘，返回文件分享链接（失败返回空字符串）"""
+    folder_token = config.get("all_in_podcast", {}).get("pdf_folder_token", "")
+    cmd = ["lark-cli", "drive", "+upload", "--file", str(pdf_path)]
+    if folder_token:
+        cmd += ["--folder-token", folder_token]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        data = json.loads(result.stdout)
+        if data.get("ok"):
+            file_token = data["data"]["file_token"]
+            return f"https://www.feishu.cn/file/{file_token}"
+    except Exception:
+        pass
+    print(f"  ⚠️  上传失败: {result.stdout[:200]}")
+    return ""
+
+
+def update_wiki_downloads(wiki_url: str, annotated_url: str, original_url: str):
+    """更新飞书 wiki 页面的「📥 下载资源」区块，替换 PDF 链接占位符"""
+    lines = []
+    if annotated_url:
+        lines.append(f"**注释版 PDF**（含 AI 注释和深度解析）：[点击下载]({annotated_url})")
+    if original_url:
+        lines.append(f"**原稿版 PDF**（纯净双语逐字稿）：[点击下载]({original_url})")
+    if not lines:
+        return
+
+    download_md = "\n\n".join(lines)
+
+    # 用唯一占位符做精确替换
+    r = subprocess.run([
+        "lark-cli", "docs", "+update",
+        "--doc", wiki_url,
+        "--mode", "replace_range",
+        "--selection-with-ellipsis", "（PDF链接待上传）...（PDF链接待上传）",
+        "--markdown", download_md
+    ], capture_output=True, text=True)
+
+    try:
+        if json.loads(r.stdout).get("ok"):
+            print(f"       ✅ 下载链接已更新到飞书页面")
+            return
+    except Exception:
+        pass
+
+    # 备用：在「📥 下载资源」标题后插入
+    r2 = subprocess.run([
+        "lark-cli", "docs", "+update",
+        "--doc", wiki_url,
+        "--mode", "insert_after",
+        "--selection-with-ellipsis", "📥 下载资源...📥 下载资源",
+        "--markdown", download_md
+    ], capture_output=True, text=True)
+
+    try:
+        if json.loads(r2.stdout).get("ok"):
+            print(f"       ✅ 下载链接已插入飞书页面（备用方式）")
+        else:
+            print(f"       ⚠️  飞书页面更新失败，请手动粘贴:")
+            for line in lines:
+                print(f"          {line}")
+    except Exception:
+        print(f"       ⚠️  飞书页面更新失败: {r2.stdout[:100]}")
+
+
 def html_to_pdf(html_path: str, pdf_path: str) -> bool:
     """用 WeasyPrint 将 HTML 转成 PDF，返回是否成功。
     通过 subprocess 传入 DYLD_LIBRARY_PATH 确保 macOS Homebrew 动态库可被 cffi 找到。
@@ -436,6 +502,7 @@ def main():
     parser.add_argument('--annotated-only', action='store_true', help='只生成注释版')
     parser.add_argument('--original-only', action='store_true', help='只生成原稿版')
     parser.add_argument('--html-only', action='store_true', help='只生成 HTML，不转 PDF（手动打印用）')
+    parser.add_argument('--skip-upload', action='store_true', help='跳过上传飞书云盘（仅本地生成）')
     parser.add_argument('--output-dir', default='/tmp', help='输出目录，默认 /tmp')
     args = parser.parse_args()
 
@@ -471,6 +538,8 @@ def main():
     else:
         versions = [('annotated', True), ('original', False)]
 
+    generated_pdfs = {}  # version_name -> pdf_path
+
     for version_name, include_annotations in versions:
         print(f"\n[生成] {version_name} 版本...")
 
@@ -492,8 +561,43 @@ def main():
         if success:
             size_kb = pdf_path.stat().st_size // 1024
             print(f"       ✅ PDF 已生成: {pdf_path} ({size_kb} KB)")
+            generated_pdfs[version_name] = pdf_path
         else:
             print(f"       ⚠️  PDF 生成失败，HTML 文件保留在: {html_path}")
+
+    # ── 上传到飞书云盘 + 更新页面下载链接 ──────────────────
+    if not args.html_only and not args.skip_upload and generated_pdfs:
+        upload_links = {}
+        for version_name, pdf_path in generated_pdfs.items():
+            print(f"\n[上传] 上传 {version_name} 版 PDF 到飞书云盘...")
+            url = upload_pdf_to_drive(config, pdf_path)
+            if url:
+                upload_links[version_name] = url
+                print(f"       {url}")
+
+        if upload_links:
+            wiki_url = record.get("飞书页面URL", "")
+            if wiki_url:
+                print(f"\n[飞书] 更新页面下载链接...")
+                update_wiki_downloads(
+                    wiki_url,
+                    upload_links.get("annotated", ""),
+                    upload_links.get("original", "")
+                )
+                # 回填收件表 PDF 状态
+                subprocess.run([
+                    "lark-cli", "base", "+record-upsert",
+                    "--base-token", config["all_in_podcast"]["base_token"],
+                    "--table-id", config["all_in_podcast"]["table_id"],
+                    "--record-id", args.record_id,
+                    "--json", json.dumps({"PDF状态": "已完成"})
+                ], capture_output=True, text=True)
+                print(f"       ✅ 收件表 PDF状态 已更新")
+            else:
+                print(f"\n⚠️  收件表中暂无「飞书页面URL」，跳过下载链接更新")
+                print(f"   请先运行 build_feishu_page.py 生成飞书页面，再重跑此步骤")
+    elif args.skip_upload:
+        print(f"\n[跳过] PDF 上传已禁用（--skip-upload）")
 
     print(f"\n✅ 完成！输出目录: {output_dir}")
 

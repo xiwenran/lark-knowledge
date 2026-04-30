@@ -197,7 +197,7 @@ def build_page_markdown(
 
 ## <text color="blue">📥 下载资源</text>
 
-（待补充）
+（PDF链接待上传）
 
 ---
 
