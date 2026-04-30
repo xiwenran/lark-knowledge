@@ -212,8 +212,11 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
 
 
 def generate_image(client: OpenAI, prompt: str, page_num: int,
-                   model: str = DEFAULT_MODEL, retry: int = 2) -> bytes | None:
-    """调用图片 API，返回图片字节"""
+                   model: str = DEFAULT_MODEL, retry: int = 3) -> bytes | None:
+    """调用图片 API，返回图片字节。
+    注意：不传 response_format 参数，兼容 VectorEngine 等中转站。
+    默认返回 URL，自动下载；若有 b64_json 则直接解码。
+    """
     for attempt in range(retry):
         try:
             response = client.images.generate(
@@ -221,18 +224,32 @@ def generate_image(client: OpenAI, prompt: str, page_num: int,
                 prompt=prompt,
                 n=1,
                 size="1024x1536",        # 3:4 竖版
-                response_format="b64_json",
+                # 不传 response_format，避免中转站不兼容
             )
-            item = response.data[0]
-            if getattr(item, 'b64_json', None):
-                return base64.b64decode(item.b64_json)
-            elif getattr(item, 'url', None):
-                with urllib.request.urlopen(item.url) as r:
+            # response 可能是 ImagesResponse 对象或 dict
+            if hasattr(response, 'data'):
+                items = response.data
+            elif isinstance(response, dict):
+                items = response.get('data', [])
+            else:
+                raise ValueError(f"意外的响应类型: {type(response)}")
+
+            item = items[0]
+            b64 = getattr(item, 'b64_json', None) or (item.get('b64_json') if isinstance(item, dict) else None)
+            url = getattr(item, 'url', None) or (item.get('url') if isinstance(item, dict) else None)
+
+            if b64:
+                return base64.b64decode(b64)
+            elif url:
+                with urllib.request.urlopen(url, timeout=60) as r:
                     return r.read()
+            else:
+                raise ValueError(f"响应中无 b64_json 也无 url: {item}")
         except Exception as e:
+            wait = 15 if attempt == 0 else 30
             if attempt < retry - 1:
-                print(f"  ⚠️  第 {page_num} 张失败（{e}），3s 后重试...")
-                time.sleep(3)
+                print(f"  ⚠️  第 {page_num} 张失败（{e}），{wait}s 后重试...")
+                time.sleep(wait)
             else:
                 print(f"  ❌  第 {page_num} 张放弃: {e}")
     return None
