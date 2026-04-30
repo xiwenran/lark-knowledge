@@ -252,6 +252,24 @@ record_id：<id>
 
 ---
 
+## Step 7: 自动接续逐字稿生成（不等用户触发）
+
+收件写入成功后，**立即自动接续**，无需用户再次输入任何指令。
+
+读取并执行 `../lark-knowledge-allin-transcript/SKILL.md`，传入：
+- **YouTube URL**：本次收件流程开始时用户提供的视频链接（直接复用，不要求用户重新输入）
+- **record_id**：Step 6C 写入成功后返回的记录 ID
+
+执行前告知用户：
+```
+收件已完成，自动开始逐字稿生成流程…
+E xxx · record_id: <id>
+```
+
+> **铁律**：收件结束 ≠ 流程结束。只要写入成功、有 YouTube URL 和 record_id，必须继续走 transcript skill，不允许停下来提示用户"如需逐字稿请手动触发"。
+
+---
+
 ## 权限
 
 `bitable:record`
