@@ -264,15 +264,20 @@ def main():
                         help='只打印提示词，不调 API')
     args = parser.parse_args()
 
-    api_key  = args.api_key  or os.environ.get('IMAGE_API_KEY')
-    api_base = args.api_base or os.environ.get('IMAGE_API_BASE') or DEFAULT_API_BASE
-    model    = args.model    or DEFAULT_MODEL
+    config = load_config()
+
+    # 优先级：命令行参数 > 环境变量 > config.json image_api 区块
+    img_cfg  = config.get('image_api', {})
+    api_key  = args.api_key  or os.environ.get('IMAGE_API_KEY')  or img_cfg.get('key', '')
+    api_base = args.api_base or os.environ.get('IMAGE_API_BASE') or img_cfg.get('base_url', '') or DEFAULT_API_BASE
+    model    = args.model    or img_cfg.get('model', '')          or DEFAULT_MODEL
 
     if not args.prompts_only and not api_key:
-        print("❌ 缺少 API Key\n   export IMAGE_API_KEY=your_key  或  --api-key your_key")
+        print("❌ 缺少图片 API Key，支持三种方式配置：")
+        print("   1. export IMAGE_API_KEY=your_key")
+        print("   2. --api-key your_key")
+        print("   3. config.json 中加 \"image_api\": {\"key\": \"your_key\", \"base_url\": \"...\", \"model\": \"...\"}")
         sys.exit(1)
-
-    config = load_config()
     print(f"[飞书] 读取收件表记录 {args.record_id}...")
     record  = get_record(config, args.record_id)
     episode = record.get('期号', 'E???')
