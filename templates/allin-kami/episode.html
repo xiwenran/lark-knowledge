@@ -15,9 +15,24 @@
   <div class="cover-title">{{TITLE_ZH}}</div>
   <div class="cover-divider"></div>
   <div class="cover-meta">
-    时长：{{DURATION}}分钟 &nbsp;·&nbsp; 播放量：{{VIEWS}}万<br>
-    主题：{{TOPIC_TAG}}
+    {{DURATION}}分钟 &nbsp;·&nbsp; 播放量 {{VIEWS}}万 &nbsp;·&nbsp; {{TOPIC_TAG}}
   </div>
+  <div class="cover-topic-badge">{{TOPIC_TAG}}</div>
+  <div class="cover-insights">
+    <div class="cover-insight-row">
+      <span class="cover-insight-label">核心议题</span>
+      <span class="cover-insight-text">{{OVERVIEW_TOPIC}}</span>
+    </div>
+    <div class="cover-insight-row">
+      <span class="cover-insight-label">关键判断</span>
+      <span class="cover-insight-text">{{OVERVIEW_KEY}}</span>
+    </div>
+    <div class="cover-insight-row">
+      <span class="cover-insight-label">国内启示</span>
+      <span class="cover-insight-text">{{OVERVIEW_CN}}</span>
+    </div>
+  </div>
+  <div class="cover-hosts">Jason · Chamath · Sacks · Friedberg</div>
 </div>
 
 <!-- ═══════════════ 核心概览 ═══════════════ -->
@@ -141,11 +156,6 @@
       All In 中文知识库收录 All In Podcast 精选期节，提供中英对照逐字稿与五维深度分析。<br>
       所有内容仅供学习参考，版权归原作者所有。
     </p>
-    <div class="xhs-cta">小红书搜索：All In 中文知识库</div>
-  </div>
-
-  <div class="page-footer">
-    <span>第 <span class="page-num"></span> 页</span>
   </div>
 
 </div><!-- .content -->

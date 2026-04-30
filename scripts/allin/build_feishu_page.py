@@ -50,14 +50,64 @@ def get_record(config: dict, record_id: str) -> dict:
 
 
 def extract_dim(text: str, marker: str) -> str:
-    """从五维分析文本提取单个维度内容"""
-    pattern = rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|$)'
-    m = re.search(pattern, text, re.DOTALL)
+    """从五维分析文本提取单个维度内容（兼容同行格式和下一行格式）"""
+    # 格式1：内容在下一行（多行段落）
+    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    # 格式2：内容在 ：/: 后的同一行
+    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
     return m.group(1).strip() if m else ''
 
 
+def parse_bilingual_turns(text: str) -> list:
+    """
+    解析双语发言，返回 [{speaker, en, zh}]
+    支持：多行英文、空行间隔、多种冒号格式
+    """
+    turns = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        en_m = re.match(r'>\s*\*\*([^*]+)\*\*\s*[：:]\s*(.*)', line)
+        if en_m:
+            speaker_en = en_m.group(1).strip()
+            en_text = en_m.group(2).strip()
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j].strip()
+                if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                    break
+                en_text += ' ' + nxt
+                j += 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            zh_text = ''
+            speaker = speaker_en
+            if j < len(lines):
+                zh_m = re.match(r'\*\*([^*]+)\*\*[：:]\s*(.*)', lines[j].strip())
+                if zh_m:
+                    speaker = zh_m.group(1).strip()
+                    zh_text = zh_m.group(2).strip()
+                    k = j + 1
+                    while k < len(lines):
+                        nxt = lines[k].strip()
+                        if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                            break
+                        zh_text += ' ' + nxt
+                        k += 1
+                    j = k
+            speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
+            turns.append({'speaker': speaker, 'en': en_text.strip(), 'zh': zh_text.strip()})
+            i = j
+        else:
+            i += 1
+    return turns
+
+
 def build_transcript_section(segments: list, annotations: dict) -> str:
-    """组装逐字稿 Markdown，在对应位置插入注释"""
+    """组装逐字稿 Markdown，每条发言单独分段，确保飞书正确渲染"""
     parts = []
     for seg in segments:
         time_label = seg.get('time_label', '')
@@ -66,15 +116,25 @@ def build_transcript_section(segments: list, annotations: dict) -> str:
         # 章节标题
         parts.append(f"\n**[{time_label}]**\n")
 
-        # 逐句双语内容（Doubao 翻译输出格式）
-        parts.append(translated)
+        # 解析双语发言，每条之间加空行确保飞书不合并引用块
+        turns = parse_bilingual_turns(translated)
+        if turns:
+            for turn in turns:
+                speaker = turn['speaker']
+                en = turn['en']
+                zh = turn['zh']
+                # 英文用引用块，中文用普通段落，空行分隔防合并
+                parts.append(f"\n> **{speaker}**: {en}\n")
+                parts.append(f"**{speaker}**：{zh}\n")
+        else:
+            # 解析失败退路：直接输出原始内容
+            parts.append(translated)
 
-        # 如果有对应章节的注释，追加 callout
-        seg_annotations = annotations.get(time_label, [])
-        for ann in seg_annotations:
+        # 章节注释
+        for ann in annotations.get(time_label, []):
             parts.append(f"\n<callout background-color=\"light-blue\">{ann}</callout>")
 
-        parts.append("\n")
+        parts.append("\n---\n")
 
     return '\n'.join(parts)
 

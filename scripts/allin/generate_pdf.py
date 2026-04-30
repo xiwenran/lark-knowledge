@@ -59,9 +59,13 @@ def get_record(config: dict, record_id: str) -> dict:
 
 
 def extract_dim(text: str, marker: str) -> str:
-    """从五维分析文本提取单个维度内容"""
-    pattern = rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|$)'
-    m = re.search(pattern, text, re.DOTALL)
+    """从五维分析文本提取单个维度内容（兼容同行格式和下一行格式）"""
+    # 格式1：内容在下一行（多行段落）
+    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    # 格式2：内容在 ：/: 后的同一行
+    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
     return m.group(1).strip() if m else ''
 
 
@@ -97,38 +101,56 @@ def parse_quotes(quotes_text: str) -> list:
 def parse_bilingual_segment(text: str) -> list:
     """
     解析 Doubao 输出的双语段落，返回 [{speaker, en, zh}] 列表
-    格式：> **Speaker**: EN text\n**Speaker**：CN text
+    健壮版：逐行扫描，支持多行英文、空行间隔、多种冒号格式
+    格式：> **Speaker**: EN text\n[空行]\n**Speaker**：CN text
     """
     turns = []
-    # 匹配每个说话人单元（> **Speaker**: EN + **Speaker**：CN）
-    pattern = r'>\s*\*\*([^*]+)\*\*\s*:\s*(.+?)\n\*\*([^*]+)\*\*[：:]\s*(.+?)(?=\n\s*\n>|\n\s*\n\*\*|\Z)'
-    for m in re.finditer(pattern, text, re.DOTALL):
-        turns.append({
-            'speaker': m.group(3).strip(),
-            'en': m.group(2).strip().replace('\n', ' '),
-            'zh': m.group(4).strip().replace('\n', ' ')
-        })
-
-    # 如果精确匹配失败，退回到按段落分割
-    if not turns:
-        lines = text.splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            if line.startswith('>'):
-                en_line = line.lstrip('> *').strip()
-                en_line = re.sub(r'^\*\*[^*]+\*\*\s*:', '', en_line).strip()
-                if i + 1 < len(lines):
-                    cn_line = lines[i+1].strip()
-                    speaker_m = re.match(r'\*\*([^*]+)\*\*[：:](.+)', cn_line)
-                    if speaker_m:
-                        turns.append({
-                            'speaker': speaker_m.group(1).strip(),
-                            'en': en_line,
-                            'zh': speaker_m.group(2).strip()
-                        })
-                        i += 2
-                        continue
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        # 找 EN 行：以 > 开头，包含 **Speaker**:
+        en_m = re.match(r'>\s*\*\*([^*]+)\*\*\s*[：:]\s*(.*)', line)
+        if en_m:
+            speaker_en = en_m.group(1).strip()
+            en_text = en_m.group(2).strip()
+            j = i + 1
+            # 收集多行英文（直到空行或 ** 行或 > 行）
+            while j < len(lines):
+                nxt = lines[j].strip()
+                if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                    break
+                en_text += ' ' + nxt
+                j += 1
+            # 跳过空行
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            # 找 ZH 行：**Speaker**：text
+            zh_text = ''
+            speaker = speaker_en
+            if j < len(lines):
+                zh_m = re.match(r'\*\*([^*]+)\*\*[：:]\s*(.*)', lines[j].strip())
+                if zh_m:
+                    speaker = zh_m.group(1).strip()
+                    zh_text = zh_m.group(2).strip()
+                    k = j + 1
+                    # 收集多行中文
+                    while k < len(lines):
+                        nxt = lines[k].strip()
+                        if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                            break
+                        zh_text += ' ' + nxt
+                        k += 1
+                    j = k
+            # 去掉说话人名中残留的 : 或 ：
+            speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
+            turns.append({
+                'speaker': speaker,
+                'en': en_text.strip(),
+                'zh': zh_text.strip()
+            })
+            i = j
+        else:
             i += 1
     return turns
 
@@ -215,18 +237,37 @@ def build_transcript_html(segments: list, annotations: dict,
                 zh = escape_html(zh_raw)
                 en = escape_html(turn.get('en', '').strip())
 
+                # 说话人颜色 class
+                spk_lower = turn['speaker'].lower()
+                if 'jason' in spk_lower:
+                    spk_cls = 'speaker-jason'
+                elif 'chamath' in spk_lower:
+                    spk_cls = 'speaker-chamath'
+                elif 'sacks' in spk_lower:
+                    spk_cls = 'speaker-sacks'
+                elif 'friedberg' in spk_lower:
+                    spk_cls = 'speaker-friedberg'
+                else:
+                    spk_cls = 'speaker-other'
+
                 if include_english and en:
-                    # 双语版：英文在上（主体，无边框），中文在下（左边框次要）
+                    # 双语版：说话人独立成行，英文次行，中文第三行
                     parts.append(
-                        f'<p class="en-para"><span class="speaker">{speaker}:</span> {en}</p>'
+                        f'<p class="speaker-label {spk_cls}">{speaker}</p>'
+                    )
+                    parts.append(
+                        f'<p class="en-para">{en}</p>'
                     )
                     parts.append(
                         f'<span class="zh-translation">{zh}</span>'
                     )
                 else:
-                    # 纯中文版
+                    # 纯中文版：说话人独立成行
                     parts.append(
-                        f'<p class="zh-para"><span class="speaker">{speaker}：</span>{zh}</p>'
+                        f'<p class="speaker-label {spk_cls}">{speaker}</p>'
+                    )
+                    parts.append(
+                        f'<p class="zh-para">{zh}</p>'
                     )
 
                 # 嵌入 callout 注释（附着在该条发言下方）

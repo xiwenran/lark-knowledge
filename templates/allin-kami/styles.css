@@ -74,6 +74,17 @@ body {
   background: var(--parchment);
 }
 
+/* no-break 在 print 和 WeasyPrint 中都生效 */
+.no-break {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.quote-block {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
 @media print {
   html, body {
     background: var(--parchment);
@@ -83,6 +94,7 @@ body {
   }
   .page-break  { page-break-after: always; break-after: page; }
   .no-break    { page-break-inside: avoid; break-inside: avoid; }
+  .quote-block { page-break-inside: avoid; break-inside: avoid; }
   h2, h3       { page-break-after: avoid; break-after: avoid; }
   .page-header { display: none; }   /* 隐藏内嵌页眉，避免重复 */
 }
@@ -255,6 +267,7 @@ body {
   font-size: 12px;
   color: var(--stone);
   margin-top: 6px;
+  text-align: right;
 }
 
 /* ═══════════════════════════════════════
@@ -284,15 +297,15 @@ body {
   color: var(--near-black);
 }
 
-/* ── 中文翻译（次要，下方，左边框）── */
+/* ── 中文翻译（次要，下方，与英文左对齐）── */
 .zh-translation {
   display: block;
   font-size: 13px;
   color: var(--olive);
   line-height: 1.7;
   margin: 0 0 16px 0;
-  padding: 6px 0 6px 12px;
-  border-left: 3px solid var(--border-soft);
+  padding: 0;
+  border-left: none;
   background: transparent;
 }
 
@@ -367,10 +380,69 @@ span[style*="color:#868e96"]  { color: var(--stone)       !important; }
   margin-bottom: 28px;
 }
 
-.back-cover .xhs-cta {
-  font-size: 13px;
-  color: var(--brand);
-  border: 1px solid var(--brand);
-  padding: 7px 22px;
-  border-radius: 20px;
+/* ═══════════════════════════════════════
+   封面增强样式
+═══════════════════════════════════════ */
+.cover-topic-badge {
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  padding: 3px 12px;
+  border-radius: 12px;
+  margin-top: 16px;
 }
+
+.cover-insights {
+  margin-top: 28px;
+  background: var(--ivory);
+  border-radius: 4px;
+  padding: 16px 20px;
+}
+
+.cover-insight-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cover-insight-row:last-child {
+  margin-bottom: 0;
+}
+
+.cover-insight-label {
+  font-weight: 500;
+  color: var(--brand);
+  min-width: 56px;
+  flex-shrink: 0;
+}
+
+.cover-insight-text {
+  color: var(--dark-warm);
+}
+
+.cover-hosts {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--stone);
+  letter-spacing: 1px;
+}
+
+/* ═══════════════════════════════════════
+   说话人标签（逐字稿用，独立成行+颜色）
+═══════════════════════════════════════ */
+.speaker-label {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 18px 0 3px 0;
+  letter-spacing: 0.2px;
+}
+
+.speaker-jason     { color: #1971c2; }
+.speaker-chamath   { color: #2f9e44; }
+.speaker-sacks     { color: #e8590c; }
+.speaker-friedberg { color: #7950f2; }
+.speaker-other     { color: var(--stone); }

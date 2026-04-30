@@ -146,7 +146,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
         'page_num': 2, 'title': '核心议题',
         'prompt': (
             f"{STYLE_BASE}\n\n"
-            f"内容（第2页 — 核心议题）：\n"
+            f"内容（核心议题）：\n"
             f"章节大标题（天蓝色手写）：本期核心议题\n"
             f"要点（每条配手绘图标和箭头）：\n{bullet_str}\n"
             f"版式：从上到下流程式排列，箭头连接，有涂鸦式分割线"
@@ -161,7 +161,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
             'page_num': 3, 'title': '市场判断',
             'prompt': (
                 f"{STYLE_BASE}\n\n"
-                f"内容（第3页 — 市场与行业判断）：\n"
+                f"内容（市场判断）：\n"
                 f"章节大标题（天蓝色手写）：市场判断\n"
                 f"要点（每条配天蓝色数据高亮框）：\n{bullet_str3}\n"
                 f"版式：要点卡片式排列，重要数字用天蓝色方框圈出"
@@ -178,7 +178,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
             'page_num': len(pages) + 1, 'title': '四人立场',
             'prompt': (
                 f"{STYLE_BASE}\n\n"
-                f"内容（第{len(pages)+1}页 — 四人立场图谱）：\n"
+                f"内容（四人立场图谱）：\n"
                 f"章节大标题（天蓝色手写）：四人怎么看\n"
                 f"四个对话气泡，各写一位主播的核心观点：\n"
                 f"  · Jason 气泡：{stances['Jason']}\n"
@@ -199,7 +199,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
         'page_num': len(pages) + 1, 'title': '国内启示',
         'prompt': (
             f"{STYLE_BASE}\n\n"
-            f"内容（最后页 — 国内启示）：\n"
+            f"内容（国内启示）：\n"
             f"章节大标题（天蓝色手写）：对我们的启示\n"
             f"可迁移判断（每条配灯泡或箭头图标）：\n{bullet_str5}\n"
             f"{quote_line}\n"
