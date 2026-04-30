@@ -202,8 +202,8 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
     if not data.get("ok"):
         raise RuntimeError(f"页面创建失败: {result.stdout}")
 
-    doc_token = data["data"]["doc_token"]
-    wiki_url = data["data"].get("wiki_url") or f"https://www.feishu.cn/wiki/{doc_token}"
+    doc_token = data["data"]["doc_id"]
+    wiki_url = data["data"].get("doc_url") or f"https://www.feishu.cn/wiki/{doc_token}"
     print(f"       页面已创建: {wiki_url}")
 
     # 逐字稿按段分批 append
