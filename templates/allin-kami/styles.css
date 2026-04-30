@@ -1,9 +1,17 @@
 /* ================================================
    All In Podcast 中文知识库 — Kami PDF 排版样式
-   版本：1.0.0 | 字体：霞鹜文楷 | 主色：#4DABF7
+   版本：2.0.0 | 设计体系：Kami（kami.tw93.fun）
+   主色：#1B365D 深藏青 | 底色：#f5f4ed 羊皮纸
+   字体：TsangerJinKai02 / Source Han Serif / Songti SC
    ================================================ */
 
-@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
+/* ── 自定义字体（从 Kami CDN 加载）── */
+@font-face {
+  font-family: 'TsangerJinKai02';
+  src: url('https://kami.tw93.fun/assets/fonts/TsangerJinKai02-W04.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
 
 /* ── 基础重置 ── */
 *, *::before, *::after {
@@ -12,48 +20,71 @@
   padding: 0;
 }
 
-/* ── 全局字体 & 颜色变量 ── */
+/* ── Kami 设计变量 ── */
 :root {
-  --sky-blue:   #4DABF7;
-  --sky-light:  #E8F4FD;
-  --text-main:  #1A1A1A;
-  --text-en:    #888888;
-  --text-note:  #555555;
-  --rule-color: #D0E8F8;
-  --font-main:  'LXGW WenKai', 'LXGWWenKai', serif;
-  --font-size-main: 16px;
-  --font-size-en:   13px;
-  --line-height:    1.9;
-  --page-width:     800px;
-  --page-padding:   48px 56px;
+  /* 颜色体系 */
+  --parchment:    #f5f4ed;   /* 主背景：米黄羊皮纸 */
+  --ivory:        #faf9f5;   /* 卡片背景：象牙白 */
+  --warm-sand:    #e8e6dc;   /* 次级背景 */
+  --brand:        #1B365D;   /* 强调色：深藏青 */
+  --brand-light:  #2D5A8A;   /* 浅藏青 */
+  --near-black:   #141413;   /* 标题文字 */
+  --dark-warm:    #3d3d3a;   /* 正文文字 */
+  --olive:        #504e49;   /* 次级文字 */
+  --stone:        #6b6a64;   /* 辅助文字 */
+  --border:       #e8e6dc;   /* 边框 */
+  --border-soft:  #e5e3d8;   /* 软分割线 */
+  /* 语义颜色（用于数据高亮） */
+  --data-red:     #c92a2a;
+  --data-green:   #2f9e44;
+  --data-orange:  #e8590c;
+  --data-purple:  #7950f2;
+
+  /* 字体栈 */
+  --font-serif:   'TsangerJinKai02', 'Source Han Serif SC',
+                  'Noto Serif CJK SC', 'Songti SC', Georgia, serif;
+
+  /* 尺寸 */
+  --page-width:   800px;
+}
+
+/* ── 全局基础 ── */
+html {
+  background: var(--parchment);
 }
 
 body {
-  font-family: var(--font-main);
-  font-size: var(--font-size-main);
-  color: var(--text-main);
-  line-height: var(--line-height);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--dark-warm);
+  line-height: 1.55;
   max-width: var(--page-width);
   margin: 0 auto;
   padding: 0;
-  background: #fff;
+  background: var(--parchment);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-/* ── 分页控制 ── */
+/* ── @page 打印规则（抑制 Chrome 自动页眉页脚）── */
+@page {
+  size: A4;
+  margin: 14mm 16mm;
+  background: var(--parchment);
+}
+
 @media print {
-  /* 隐藏 Chrome headless 自动加的页眉页脚（文件路径/日期） */
-  @page {
-    size: A4;
-    margin: 20mm 18mm 20mm 18mm;
+  html, body {
+    background: var(--parchment);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    max-width: 100%;
   }
-  body { max-width: 100%; }
-  .page-break { page-break-after: always; break-after: page; }
+  .page-break  { page-break-after: always; break-after: page; }
   .no-break    { page-break-inside: avoid; break-inside: avoid; }
   h2, h3       { page-break-after: avoid; break-after: avoid; }
-  /* 去掉页面内置的 header 元素在打印时的重复 */
-  .page-header { display: none; }
+  .page-header { display: none; }   /* 隐藏内嵌页眉，避免重复 */
 }
 
 /* ═══════════════════════════════════════
@@ -64,213 +95,228 @@ body {
   flex-direction: column;
   justify-content: center;
   min-height: 100vh;
-  padding: 80px 56px;
-  border-top: 6px solid var(--sky-blue);
+  padding: 80px 64px;
+  background: var(--parchment);
+  border-top: 5px solid var(--brand);
+  position: relative;
 }
 
 .cover-series {
-  font-size: 13px;
-  color: var(--sky-blue);
-  letter-spacing: 0.15em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--brand);
+  letter-spacing: 0.4px;
   text-transform: uppercase;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .cover-episode {
-  font-size: 15px;
-  color: var(--text-en);
-  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--stone);
+  margin-bottom: 10px;
 }
 
 .cover-title {
   font-size: 34px;
-  font-weight: bold;
-  color: var(--text-main);
-  line-height: 1.4;
+  font-weight: 500;
+  color: var(--near-black);
+  line-height: 1.3;
   margin-bottom: 32px;
+  letter-spacing: -0.3px;
+}
+
+.cover-divider {
+  width: 48px;
+  height: 2px;
+  background: var(--brand);
+  margin: 24px 0;
 }
 
 .cover-meta {
   font-size: 13px;
-  color: var(--text-en);
-  line-height: 2;
-}
-
-.cover-divider {
-  width: 60px;
-  height: 3px;
-  background: var(--sky-blue);
-  margin: 28px 0;
+  color: var(--olive);
+  line-height: 1.9;
 }
 
 /* ═══════════════════════════════════════
-   页眉 / 页脚
+   内容区通用
 ═══════════════════════════════════════ */
+.content {
+  padding: 48px 64px;
+  background: var(--parchment);
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 0 12px;
-  border-bottom: 1px solid var(--rule-color);
+  padding: 14px 0 10px;
+  border-bottom: 1px solid var(--border-soft);
   font-size: 11px;
-  color: var(--text-en);
-  margin-bottom: 32px;
+  color: var(--stone);
+  margin-bottom: 28px;
+  letter-spacing: 0.2px;
 }
 
-.page-header .series { color: var(--sky-blue); }
+.page-header .series {
+  color: var(--brand);
+  font-weight: 500;
+}
 
-.page-footer {
-  display: flex;
-  justify-content: center;
-  padding: 16px 0;
-  border-top: 1px solid var(--rule-color);
-  font-size: 11px;
-  color: var(--text-en);
+/* ── 分割线 ── */
+.section-rule {
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  margin: 32px 0;
+}
+
+.section-rule.page-break {
   margin-top: 40px;
 }
 
 /* ═══════════════════════════════════════
-   主内容区
+   核心概览块
 ═══════════════════════════════════════ */
-.content {
-  padding: var(--page-padding);
+.overview-block {
+  background: var(--ivory);
+  border-left: 3px solid var(--brand);
+  border-radius: 3px;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--dark-warm);
 }
 
-/* ── 章节分隔线 ── */
-.section-rule {
-  border: none;
-  border-top: 1px solid var(--rule-color);
-  margin: 36px 0;
+.overview-block .label {
+  font-weight: 500;
+  color: var(--brand);
+  margin-right: 6px;
 }
 
+/* ═══════════════════════════════════════
+   五维分析
+═══════════════════════════════════════ */
+.analysis-heading {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--near-black);
+  margin: 32px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+  letter-spacing: 0.2px;
+}
+
+.analysis-sub {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--brand);
+  margin: 22px 0 8px;
+}
+
+.analysis-sub::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--brand);
+  vertical-align: middle;
+  margin-right: 8px;
+  margin-bottom: 2px;
+}
+
+/* ═══════════════════════════════════════
+   精华金句
+═══════════════════════════════════════ */
+.quote-block {
+  background: var(--ivory);
+  border-left: 3px solid var(--brand);
+  border-radius: 3px;
+  padding: 14px 18px;
+  margin: 14px 0;
+}
+
+.quote-en {
+  font-size: 13px;
+  color: var(--olive);
+  font-style: italic;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.quote-zh {
+  font-size: 14px;
+  color: var(--dark-warm);
+  line-height: 1.6;
+}
+
+.quote-speaker {
+  font-size: 12px;
+  color: var(--stone);
+  margin-top: 6px;
+}
+
+/* ═══════════════════════════════════════
+   逐字稿
+═══════════════════════════════════════ */
 /* ── 章节标题（时间段 + 主题）── */
 .chapter-heading {
-  color: var(--sky-blue);
-  font-size: 15px;
-  font-weight: bold;
-  margin: 40px 0 16px;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--sky-light);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--brand);
+  margin: 36px 0 14px;
+  padding: 6px 0 6px 12px;
+  border-left: 3px solid var(--brand);
+  background: var(--ivory);
 }
 
 /* ── 中文段落 ── */
 .zh-para {
-  margin-bottom: 10px;
-  text-indent: 2em;
+  margin-bottom: 8px;
+  line-height: 1.75;
+  color: var(--dark-warm);
+}
+
+.zh-para .speaker {
+  font-weight: 500;
+  color: var(--near-black);
 }
 
 /* ── 英文原文 ── */
 .en-text {
   display: block;
-  font-size: var(--font-size-en);
-  color: var(--text-en);
-  line-height: 1.7;
-  margin: 8px 0 16px;
-  padding-left: 1em;
-  border-left: 2px solid var(--rule-color);
-}
-
-.en-text::before {
-  content: "EN: ";
-  font-weight: bold;
-  color: #aaa;
+  font-size: 12.5px;
+  color: var(--stone);
+  line-height: 1.6;
+  margin: 6px 0 14px 1em;
+  padding: 8px 12px;
+  border-left: 2px solid var(--border-soft);
+  background: var(--ivory);
+  font-style: italic;
 }
 
 /* ── 注释块 ── */
 .annotation {
-  background: var(--sky-light);
-  border-left: 3px solid var(--sky-blue);
-  border-radius: 4px;
-  padding: 12px 16px;
-  margin: 10px 0 18px;
-  font-size: 14px;
-  color: var(--text-note);
-  line-height: 1.8;
-}
-
-/* ── 核心概览块（黄色）── */
-.overview-block {
-  background: #FFFBEC;
-  border-left: 3px solid #F5C842;
-  border-radius: 4px;
-  padding: 14px 18px;
-  margin: 20px 0;
-  font-size: 14px;
-  line-height: 1.9;
-}
-
-.overview-block .label {
-  font-weight: bold;
-  color: #B8860B;
-  margin-right: 6px;
-}
-
-/* ── 五维分析章节标题 ── */
-.analysis-heading {
-  font-size: 17px;
-  font-weight: bold;
-  color: var(--text-main);
-  margin: 32px 0 12px;
-}
-
-.analysis-sub {
-  font-size: 15px;
-  font-weight: bold;
-  color: var(--sky-blue);
-  margin: 20px 0 8px;
-}
-
-/* ── 精华金句 ── */
-.quote-block {
-  border-left: 3px solid var(--sky-blue);
-  padding: 10px 16px;
-  margin: 14px 0;
-  background: #F8FBFF;
-}
-
-.quote-en {
-  font-size: 14px;
-  color: var(--text-main);
-  font-style: italic;
-  margin-bottom: 6px;
-}
-
-.quote-zh {
+  background: var(--ivory);
+  border-left: 3px solid var(--brand-light);
+  border-radius: 3px;
+  padding: 10px 14px;
+  margin: 10px 0 16px;
   font-size: 13px;
-  color: var(--text-en);
+  color: var(--olive);
+  line-height: 1.7;
 }
 
-.quote-speaker {
-  font-size: 12px;
-  color: #aaa;
-  margin-top: 4px;
-}
-
-/* ── 说话人标注 ── */
-.speaker {
-  font-weight: bold;
-  color: var(--text-main);
-}
-
-/* ── 信息标签栏（期号/日期/时长等）── */
-.episode-meta-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  font-size: 13px;
-  color: var(--text-en);
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--rule-color);
-}
-
-.episode-meta-bar .tag {
-  background: var(--sky-light);
-  color: var(--sky-blue);
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-}
+/* ═══════════════════════════════════════
+   数据高亮（feishu_to_html 输出的 span）
+═══════════════════════════════════════ */
+span[style*="color:#e03131"]  { color: var(--data-red)    !important; }
+span[style*="color:#1971c2"]  { color: var(--brand)       !important; }
+span[style*="color:#2f9e44"]  { color: var(--data-green)  !important; }
+span[style*="color:#e8590c"]  { color: var(--data-orange) !important; }
+span[style*="color:#7950f2"]  { color: var(--data-purple) !important; }
+span[style*="color:#868e96"]  { color: var(--stone)       !important; }
 
 /* ═══════════════════════════════════════
    封底页
@@ -280,25 +326,26 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 60vh;
+  min-height: 50vh;
   text-align: center;
-  padding: 60px 56px;
-  border-top: 6px solid var(--sky-blue);
+  padding: 60px 64px;
+  border-top: 2px solid var(--border-soft);
   margin-top: 40px;
+  background: var(--parchment);
 }
 
 .back-cover .series-intro {
   font-size: 14px;
-  color: var(--text-note);
-  line-height: 2;
+  color: var(--olive);
+  line-height: 1.8;
   max-width: 480px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .back-cover .xhs-cta {
-  font-size: 14px;
-  color: var(--sky-blue);
-  border: 1px solid var(--sky-blue);
-  padding: 8px 24px;
+  font-size: 13px;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  padding: 7px 22px;
   border-radius: 20px;
 }
