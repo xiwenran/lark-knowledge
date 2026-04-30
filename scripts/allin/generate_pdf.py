@@ -193,11 +193,11 @@ def extract_callouts(text: str):
 
 def build_transcript_html(segments: list, annotations: dict,
                           include_annotations: bool,
-                          include_english: bool = False) -> str:
+                          include_english: bool = True) -> str:
     """生成逐字稿 HTML
 
-    include_english=False（默认）：纯中文版，不显示英文原文
-    include_english=True：双语版，英文以次级样式跟在中文之后
+    include_english=True（默认）：双语版，英文在上（en-para 主体），中文翻译在下（zh-translation 左边框）
+    include_english=False：纯中文版，仅显示中文（zh-para）
     """
     parts = []
     for seg in segments:
@@ -210,18 +210,26 @@ def build_transcript_html(segments: list, annotations: dict,
         if turns:
             for turn in turns:
                 speaker = escape_html(turn['speaker'])
-                # 提取 zh 中的 callout 块，避免原样显示飞书标签
+                # 提取 zh 中的 callout 块
                 zh_raw, turn_callouts = extract_callouts(turn.get('zh', ''))
                 zh = escape_html(zh_raw)
-                parts.append(
-                    f'<p class="zh-para"><span class="speaker">{speaker}：</span>{zh}</p>'
-                )
-                # 英文原文（仅双语模式显示）
-                if include_english:
-                    en = turn.get('en', '').strip()
-                    if en:
-                        parts.append(f'<span class="en-text">{escape_html(en)}</span>')
-                # 嵌入 callout 注释（附着在对应发言下方）
+                en = escape_html(turn.get('en', '').strip())
+
+                if include_english and en:
+                    # 双语版：英文在上（主体，无边框），中文在下（左边框次要）
+                    parts.append(
+                        f'<p class="en-para"><span class="speaker">{speaker}:</span> {en}</p>'
+                    )
+                    parts.append(
+                        f'<span class="zh-translation">{zh}</span>'
+                    )
+                else:
+                    # 纯中文版
+                    parts.append(
+                        f'<p class="zh-para"><span class="speaker">{speaker}：</span>{zh}</p>'
+                    )
+
+                # 嵌入 callout 注释（附着在该条发言下方）
                 if include_annotations and turn_callouts:
                     for callout in turn_callouts:
                         parts.append(
@@ -297,7 +305,7 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     # 逐字稿
     annotations = analysis.get('annotations', {})
     transcript_html = build_transcript_html(segments, annotations, include_annotations,
-                                             include_english=False)
+                                             include_english=True)
     quotes_html = build_quotes_html(quotes)
 
     # 概览摘要（从五维提取首句，同时处理飞书标签）
