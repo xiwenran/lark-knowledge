@@ -46,14 +46,18 @@ def extract_dim(text: str, marker: str) -> str:
 def parse_bilingual_turns(text: str) -> list:
     """
     解析双语发言，返回 [{speaker, en, zh}]
-    支持：多行英文、空行间隔、多种冒号格式
+    支持 Doubao 输出的两种格式：
+      > Speaker: EN text       （无加粗，Doubao-seed 实际输出）
+      > **Speaker**: EN text   （有加粗，兼容旧格式）
+    中文行格式：**Speaker**：ZH text
     """
     turns = []
     lines = text.splitlines()
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        en_m = re.match(r'>\s*\*\*([^*]+)\*\*\s*[：:]\s*(.*)', line)
+        # 匹配 EN 行：> [**]Speaker[**]: text（说话人有无加粗均可）
+        en_m = re.match(r'>\s*\*{0,2}([^*:\n>]+?)\*{0,2}\s*[：:]\s*(.*)', line)
         if en_m:
             speaker_en = en_m.group(1).strip()
             en_text = en_m.group(2).strip()
@@ -106,12 +110,14 @@ def build_transcript_section(segments: list, annotations: dict) -> str:
                 speaker = turn['speaker']
                 en = turn['en']
                 zh = turn['zh']
-                # 英文用引用块，中文用普通段落，空行分隔防合并
-                parts.append(f"\n> **{speaker}**: {en}\n")
-                parts.append(f"**{speaker}**：{zh}\n")
+                # 中文在前（粗体主体），英文在后（斜体辅助），无 > 前缀防飞书合并引用块
+                parts.append(f"\n**{speaker}**：{zh}\n")
+                if en:
+                    parts.append(f"*{speaker}: {en}*\n\n")
         else:
-            # 解析失败退路：直接输出原始内容
-            parts.append(translated)
+            # 解析失败退路：去掉 > 前缀后直接输出，避免飞书合并引用块
+            clean = re.sub(r'^>\s*', '', translated, flags=re.MULTILINE)
+            parts.append(clean)
 
         # 章节注释
         for ann in annotations.get(time_label, []):

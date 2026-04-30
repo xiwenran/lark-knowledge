@@ -84,15 +84,18 @@ def parse_bilingual_segment(text: str) -> list:
     """
     解析 Doubao 输出的双语段落，返回 [{speaker, en, zh}] 列表
     健壮版：逐行扫描，支持多行英文、空行间隔、多种冒号格式
-    格式：> **Speaker**: EN text\n[空行]\n**Speaker**：CN text
+    支持格式：
+      > Speaker: EN text       （无加粗，Doubao-seed 实际输出）
+      > **Speaker**: EN text   （有加粗，兼容旧格式）
+    中文行：**Speaker**：CN text
     """
     turns = []
     lines = text.splitlines()
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        # 找 EN 行：以 > 开头，包含 **Speaker**:
-        en_m = re.match(r'>\s*\*\*([^*]+)\*\*\s*[：:]\s*(.*)', line)
+        # 找 EN 行：以 > 开头，说话人有无加粗均可
+        en_m = re.match(r'>\s*\*{0,2}([^*:\n>]+?)\*{0,2}\s*[：:]\s*(.*)', line)
         if en_m:
             speaker_en = en_m.group(1).strip()
             en_text = en_m.group(2).strip()
