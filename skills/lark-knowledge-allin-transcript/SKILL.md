@@ -193,26 +193,32 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 ### 逐字稿格式（每个章节）
 
 ```markdown
-**[HH:MM–HH:MM] 章节主题（AI概括）**
+**[HH:MM:SS–HH:MM:SS]**
 
-> **Jason**: 英文原句
 **Jason**：中文翻译
 
-> **Chamath**: 英文原句
+*Jason: English original text*
+
 **Chamath**：中文翻译
+
+*Chamath: English original text*
 
 <callout background-color="light-blue">注释内容，1-2句，自然散文风格</callout>
 ```
+
+> **设计原则**：中文粗体在前（主要阅读层），英文斜体在后（参考层），不用 `> ` 引用块前缀。
+> 飞书会将连续 `> ` 行合并成单一引用块，导致全段被压成一个块——已在 v2.3 移除。
 
 ### 格式铁律
 
 | 规则 | 执行方式 |
 |------|---------|
 | 章节标题 | `## <text color="blue">标题</text>` |
-| 英文原句 | `> **说话人**: 原文`（引用块） |
-| 中文译文 | `**说话人**：译文` |
+| 中文译文 | `**说话人**：译文`（粗体，每条发言首行） |
+| 英文原句 | `*说话人: 原文*`（斜体，中文后紧跟） |
 | 注释块 | `<callout background-color="light-blue">` 无 emoji 无标题 |
 | 概览块 | `<callout background-color="light-yellow">` |
+| **禁止** | 逐字稿区域不用 `> ` 引用块前缀（会触发飞书引用合并） |
 | **禁止** | 逐字稿区域不用 `<text color="red/blue/...">` 着色词 |
 | red 着色 | 仅限五维分析里的关键数字 |
 
