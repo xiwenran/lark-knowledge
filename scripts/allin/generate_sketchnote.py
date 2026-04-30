@@ -38,7 +38,7 @@ SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
-DEFAULT_API_BASE = "https://api.vectorengine.cn"
+DEFAULT_API_BASE = "https://api.vectorengine.cn/v1"
 DEFAULT_MODEL = "gpt-image-2"
 
 # ── 风格基底（所有图共用）────────────────────────────────
@@ -246,7 +246,7 @@ def generate_image(client: OpenAI, prompt: str, page_num: int,
             else:
                 raise ValueError(f"响应中无 b64_json 也无 url: {item}")
         except Exception as e:
-            wait = 15 if attempt == 0 else 30
+            wait = 60 if attempt == 0 else 90
             if attempt < retry - 1:
                 print(f"  ⚠️  第 {page_num} 张失败（{e}），{wait}s 后重试...")
                 time.sleep(wait)

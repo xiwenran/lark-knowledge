@@ -191,8 +191,14 @@ def extract_callouts(text: str):
     return clean.strip(), callouts
 
 
-def build_transcript_html(segments: list, annotations: dict, include_annotations: bool) -> str:
-    """生成逐字稿 HTML"""
+def build_transcript_html(segments: list, annotations: dict,
+                          include_annotations: bool,
+                          include_english: bool = False) -> str:
+    """生成逐字稿 HTML
+
+    include_english=False（默认）：纯中文版，不显示英文原文
+    include_english=True：双语版，英文以次级样式跟在中文之后
+    """
     parts = []
     for seg in segments:
         time_label = seg.get('time_label', '')
@@ -210,10 +216,11 @@ def build_transcript_html(segments: list, annotations: dict, include_annotations
                 parts.append(
                     f'<p class="zh-para"><span class="speaker">{speaker}：</span>{zh}</p>'
                 )
-                # 英文原文紧跟在该条发言之后（逐条显示）
-                en = turn.get('en', '').strip()
-                if en:
-                    parts.append(f'<span class="en-text">{escape_html(en)}</span>')
+                # 英文原文（仅双语模式显示）
+                if include_english:
+                    en = turn.get('en', '').strip()
+                    if en:
+                        parts.append(f'<span class="en-text">{escape_html(en)}</span>')
                 # 嵌入 callout 注释（附着在对应发言下方）
                 if include_annotations and turn_callouts:
                     for callout in turn_callouts:
@@ -289,7 +296,8 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
 
     # 逐字稿
     annotations = analysis.get('annotations', {})
-    transcript_html = build_transcript_html(segments, annotations, include_annotations)
+    transcript_html = build_transcript_html(segments, annotations, include_annotations,
+                                             include_english=False)
     quotes_html = build_quotes_html(quotes)
 
     # 概览摘要（从五维提取首句，同时处理飞书标签）
