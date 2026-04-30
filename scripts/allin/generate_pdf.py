@@ -2,13 +2,15 @@
 """
 generate_pdf.py — 生成 All In Podcast 知识库 PDF
 
-从 bilingual.json + analysis.json 填充 HTML 模板，用 Chrome headless 导出 PDF。
+从 bilingual.json + analysis.json 填充 HTML 模板，用 WeasyPrint 导出 PDF。
 默认同时生成「注释版」和「原稿版」两份 PDF。
 
 用法：
   python3 generate_pdf.py bilingual.json --record-id recXXX
   python3 generate_pdf.py bilingual.json --record-id recXXX --annotated-only
   python3 generate_pdf.py bilingual.json --record-id recXXX --html-only  # 只生成HTML，浏览器手动打印
+
+依赖：pip3 install weasyprint  /  macOS: brew install pango
 
 输出：
   /tmp/allin_E270_annotated.pdf   注释版（含内联注释）
@@ -21,9 +23,11 @@ import re
 import sys
 import argparse
 import subprocess
-import shutil
-import tempfile
 from pathlib import Path
+
+# macOS Homebrew 库路径（WeasyPrint 依赖 libgobject/libpango）
+# DYLD_LIBRARY_PATH 需在进程启动前设置，由 html_to_pdf() 通过 subprocess 传入
+_HOMEBREW_LIB = "/opt/homebrew/lib"
 
 # ── 路径配置 ─────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent
@@ -32,15 +36,7 @@ TEMPLATE_DIR = REPO_ROOT / "templates" / "allin-kami"
 TEMPLATE_HTML = TEMPLATE_DIR / "episode.html"
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
-# macOS Chrome 路径（优先级顺序）
-CHROME_PATHS = [
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "chromium",
-    "google-chrome",
-]
+# (Chrome 路径已移除，渲染引擎改为 WeasyPrint)
 
 
 def load_config() -> dict:
@@ -338,45 +334,39 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
                   transcript_html,
                   html, flags=re.DOTALL)
 
-    # 修正 CSS 路径为绝对路径（Chrome headless 需要）
+    # 修正 CSS 路径为绝对路径（WeasyPrint 需要 file:// 路径）
     css_abs = str(TEMPLATE_DIR / "styles.css")
     html = html.replace('href="styles.css"', f'href="file://{css_abs}"')
 
     return html
 
 
-def find_chrome() -> str | None:
-    """找到系统中可用的 Chrome/Chromium"""
-    for path in CHROME_PATHS:
-        if Path(path).exists():
-            return path
-        found = shutil.which(path)
-        if found:
-            return found
-    return None
-
-
 def html_to_pdf(html_path: str, pdf_path: str) -> bool:
-    """用 Chrome headless 将 HTML 转成 PDF，返回是否成功"""
-    chrome = find_chrome()
-    if not chrome:
-        print("⚠️  未找到 Chrome/Chromium，无法自动生成 PDF")
-        print("   请在浏览器中打开 HTML 文件，手动「文件→打印→另存为 PDF」")
-        return False
+    """用 WeasyPrint 将 HTML 转成 PDF，返回是否成功。
+    通过 subprocess 传入 DYLD_LIBRARY_PATH 确保 macOS Homebrew 动态库可被 cffi 找到。
+    """
+    env = os.environ.copy()
+    if sys.platform == "darwin":
+        existing = env.get("DYLD_LIBRARY_PATH", "")
+        if _HOMEBREW_LIB not in existing:
+            env["DYLD_LIBRARY_PATH"] = f"{_HOMEBREW_LIB}:{existing}".rstrip(":")
 
-    cmd = [
-        chrome,
-        "--headless",          # 旧版 headless，--print-to-pdf-no-header 在此模式更可靠
-        "--print-to-pdf=" + pdf_path,
-        "--print-to-pdf-no-header",
-        "--no-sandbox",
-        "--disable-gpu",
-        "--disable-software-rasterizer",
-        "file://" + html_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    if result.returncode != 0:
-        print(f"   ⚠️ Chrome 返回错误: {result.stderr[:200]}")
+    code = (
+        "import sys; from weasyprint import HTML; "
+        f"HTML(filename={html_path!r}).write_pdf({pdf_path!r}); "
+        "print('ok')"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True, text=True, timeout=120, env=env
+    )
+    if result.returncode != 0 or "ok" not in result.stdout:
+        stderr = result.stderr.strip()
+        if "ModuleNotFoundError" in stderr or "ImportError" in stderr:
+            print("⚠️  WeasyPrint 未安装，请运行：pip3 install weasyprint")
+            print("   macOS 还需要：brew install pango")
+        else:
+            print(f"⚠️  WeasyPrint 渲染失败：{stderr[:300]}")
         return False
     return True
 
