@@ -43,10 +43,17 @@ body {
 
 /* ── 分页控制 ── */
 @media print {
+  /* 隐藏 Chrome headless 自动加的页眉页脚（文件路径/日期） */
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+  }
   body { max-width: 100%; }
-  .page-break { page-break-after: always; }
-  .no-break    { page-break-inside: avoid; }
-  h2, h3       { page-break-after: avoid; }
+  .page-break { page-break-after: always; break-after: page; }
+  .no-break    { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3       { page-break-after: avoid; break-after: avoid; }
+  /* 去掉页面内置的 header 元素在打印时的重复 */
+  .page-header { display: none; }
 }
 
 /* ═══════════════════════════════════════

@@ -138,12 +138,49 @@ def parse_bilingual_segment(text: str) -> list:
 
 
 def escape_html(text: str) -> str:
-    """转义 HTML 特殊字符"""
+    """转义 HTML 特殊字符（不转义飞书 <text> 标签）"""
     return (text
             .replace('&', '&amp;')
             .replace('<', '&lt;')
             .replace('>', '&gt;')
             .replace('"', '&quot;'))
+
+
+# 飞书颜色名 → CSS 颜色值
+_FEISHU_COLOR_MAP = {
+    'red':    '#e03131',
+    'blue':   '#1971c2',
+    'green':  '#2f9e44',
+    'orange': '#e8590c',
+    'purple': '#7950f2',
+    'grey':   '#868e96',
+    'gray':   '#868e96',
+}
+
+
+def feishu_to_html(text: str) -> str:
+    """将飞书富文本标签转为 HTML <span>，其余内容 HTML 转义。
+    支持：<text color="red/blue/green/orange/purple/grey">…</text>
+    支持：**加粗**
+    """
+    import re as _re
+
+    # 先按 <text color="...">…</text> 分割，交替处理
+    parts = _re.split(r'(<text color="[^"]+">.*?</text>)', text, flags=_re.DOTALL)
+    result = []
+    for part in parts:
+        m = _re.match(r'<text color="([^"]+)">(.*?)</text>', part, _re.DOTALL)
+        if m:
+            color_name = m.group(1)
+            content = m.group(2)
+            hex_color = _FEISHU_COLOR_MAP.get(color_name, '#333333')
+            result.append(f'<span style="color:{hex_color};font-weight:600">{escape_html(content)}</span>')
+        else:
+            # 普通文本：先转义，再处理 **加粗**
+            escaped = escape_html(part)
+            escaped = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', escaped)
+            result.append(escaped)
+    return ''.join(result)
 
 
 def build_transcript_html(segments: list, annotations: dict, include_annotations: bool) -> str:
@@ -239,10 +276,13 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     transcript_html = build_transcript_html(segments, annotations, include_annotations)
     quotes_html = build_quotes_html(quotes)
 
-    # 概览摘要（从五维提取首句）
+    # 概览摘要（从五维提取首句，同时处理飞书标签）
     def first_sentence(text):
         if text and text != '（待补充）':
-            return text.split('。')[0][:60] + '…'
+            # 先去掉 <text color> 标签，取纯文字后再截断
+            import re as _re
+            plain = _re.sub(r'<text color="[^"]+">|</text>', '', text)
+            return escape_html(plain.split('。')[0][:60] + '…')
         return '见五维分析'
 
     # 简单字符串替换（模板用 {{VAR}} 占位符）
@@ -256,11 +296,11 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
         '{{OVERVIEW_TOPIC}}': first_sentence(dim1),
         '{{OVERVIEW_KEY}}': first_sentence(dim2),
         '{{OVERVIEW_CN}}': first_sentence(dim5),
-        '{{ANALYSIS_1}}': escape_html(dim1),
-        '{{ANALYSIS_2}}': escape_html(dim2),
-        '{{ANALYSIS_3}}': escape_html(dim3),
-        '{{ANALYSIS_4}}': escape_html(dim4),
-        '{{ANALYSIS_5}}': escape_html(dim5),
+        '{{ANALYSIS_1}}': feishu_to_html(dim1),
+        '{{ANALYSIS_2}}': feishu_to_html(dim2),
+        '{{ANALYSIS_3}}': feishu_to_html(dim3),
+        '{{ANALYSIS_4}}': feishu_to_html(dim4),
+        '{{ANALYSIS_5}}': feishu_to_html(dim5),
     }
 
     html = template
