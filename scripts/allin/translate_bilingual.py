@@ -89,9 +89,14 @@ def translate_segment(client: OpenAI, segment: dict, retry: int = 3) -> dict:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,  # 翻译任务低温度，保持一致性
-                max_tokens=4096
+                max_tokens=8192   # 从 4096 升到 8192，防止 15 分钟长段输出被截断
             )
-            translated_text = resp.choices[0].message.content.strip()
+            choice = resp.choices[0]
+            # 检查是否因 token 耗尽被截断
+            if getattr(choice, 'finish_reason', None) == 'length':
+                print(f"  ⚠️  段 {segment['index']} 输出被 token 上限截断（finish_reason=length），"
+                      f"末尾内容可能丢失！建议缩小 --segment-minutes 到 10")
+            translated_text = choice.message.content.strip()
             return {
                 **segment,
                 'translated': translated_text,

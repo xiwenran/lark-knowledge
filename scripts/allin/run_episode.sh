@@ -69,7 +69,7 @@ for p in patterns:
 print('unknown')
 " "$YOUTUBE_URL")
 
-if [ "\$VIDEO_ID" = "unknown" ]; then
+if [ "$VIDEO_ID" = "unknown" ]; then
   echo "❌ 无法从 URL 提取视频 ID，请检查 YouTube 链接格式"
   echo "   支持格式：?v=xxx / youtu.be/xxx / /shorts/xxx / /live/xxx"
   exit 1

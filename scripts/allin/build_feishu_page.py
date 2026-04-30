@@ -258,7 +258,7 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
 
     # 逐字稿按段分批 append
     if transcript_part.strip():
-        seg_blocks = re.split(r'\n(?=\*\*\[)', transcript_part)
+        seg_blocks = [b for b in re.split(r'\n(?=\*\*\[)', transcript_part) if b.strip()]
         batch_size = 4
         total_batches = (len(seg_blocks) + batch_size - 1) // batch_size
         failed_batches = []

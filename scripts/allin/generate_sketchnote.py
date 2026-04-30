@@ -55,8 +55,16 @@ STYLE_BASE = (
 
 
 def extract_dim(text: str, marker: str) -> str:
-    pattern = rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)'
-    m = re.search(pattern, text, re.DOTALL)
+    """兼容两种 AI 输出格式：
+    格式1（内容在下一行）：① 议题背景\n内容...
+    格式2（内容在同行）：① 议题背景：内容...
+    """
+    # 格式1：内容在下一行
+    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    # 格式2：内容在 ：/: 后的同行
+    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
     return m.group(1).strip() if m else ''
 
 

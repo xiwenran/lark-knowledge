@@ -179,7 +179,9 @@ def feishu_to_html(text: str) -> str:
             color_name = m.group(1)
             content = m.group(2)
             hex_color = _FEISHU_COLOR_MAP.get(color_name, '#333333')
-            result.append(f'<span style="color:{hex_color};font-weight:600">{escape_html(content)}</span>')
+            # 先处理内部 **加粗**，再转义剩余文本
+            content_html = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', escape_html(content))
+            result.append(f'<span style="color:{hex_color};font-weight:600">{content_html}</span>')
         else:
             # 普通文本：先转义，再处理 **加粗**
             escaped = escape_html(part)
@@ -272,10 +274,15 @@ def build_transcript_html(segments: list, annotations: dict,
                         f'<div class="annotation no-break">{escape_html(ann)}</div>'
                     )
         else:
-            # 解析失败时直接显示原文（去掉飞书标签）
+            # 解析失败时直接显示原文（去掉飞书标签），不截断
             clean_text, _ = extract_callouts(translated)
             clean_text = re.sub(r'<text color="[^"]+">|</text>', '', clean_text)
-            parts.append(f'<p class="zh-para">{escape_html(clean_text[:400])}…</p>')
+            # 去掉 > 前缀，按行分段输出（防止全文塌成一行）
+            for raw_line in clean_text.splitlines():
+                raw_line = raw_line.lstrip('> ').strip()
+                if raw_line:
+                    parts.append(f'<p class="zh-para">{escape_html(raw_line)}</p>')
+            print(f"  ⚠️  段 [{time_label}] 解析失败，已退路输出原文（{len(clean_text)} 字符）")
 
         parts.append('<hr class="section-rule">')
 
