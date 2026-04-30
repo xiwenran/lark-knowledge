@@ -55,7 +55,7 @@ def parse_vtt(vtt_path: str) -> list[dict]:
     解析 VTT 文件，返回去重后的句子列表
     每条：{time_start: float, time_end: float, text: str, speaker_change: bool}
     """
-    content = Path(vtt_path).read_text(encoding='utf-8')
+    content = Path(vtt_path).read_text(encoding='utf-8-sig')  # utf-8-sig 自动处理 BOM
     lines = content.splitlines()
 
     blocks = []

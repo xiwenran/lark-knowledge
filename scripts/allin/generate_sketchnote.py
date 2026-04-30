@@ -36,10 +36,14 @@ from openai import OpenAI
 
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
 DEFAULT_API_BASE = "https://api.vectorengine.cn/v1"
 DEFAULT_MODEL = "gpt-image-2"
+
+# 引入共享工具
+import sys as _sys
+_sys.path.insert(0, str(SCRIPT_DIR))
+from utils import load_config, get_record
 
 # ── 风格基底（所有图共用）────────────────────────────────
 STYLE_BASE = (
@@ -50,26 +54,8 @@ STYLE_BASE = (
 )
 
 
-def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-
-
-def get_record(config: dict, record_id: str) -> dict:
-    result = subprocess.run([
-        "lark-cli", "base", "+record-get",
-        "--base-token", config["all_in_podcast"]["base_token"],
-        "--table-id", config["all_in_podcast"]["table_id"],
-        "--record-id", record_id
-    ], capture_output=True, text=True)
-    raw = json.loads(result.stdout)["data"]["record"]
-    normalized = {}
-    for k, v in raw.items():
-        normalized[k] = v[0] if isinstance(v, list) and len(v) == 1 else v
-    return normalized
-
-
 def extract_dim(text: str, marker: str) -> str:
-    pattern = rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|$)'
+    pattern = rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)'
     m = re.search(pattern, text, re.DOTALL)
     return m.group(1).strip() if m else ''
 

@@ -27,26 +27,9 @@ import argparse
 import subprocess
 from pathlib import Path
 
-CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
-
-
-def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-
-
-def get_record(config: dict, record_id: str) -> dict:
-    """从飞书收件表读取记录，数组类型字段自动取第一个值"""
-    result = subprocess.run([
-        "lark-cli", "base", "+record-get",
-        "--base-token", config["all_in_podcast"]["base_token"],
-        "--table-id", config["all_in_podcast"]["table_id"],
-        "--record-id", record_id
-    ], capture_output=True, text=True)
-    raw = json.loads(result.stdout)["data"]["record"]
-    normalized = {}
-    for k, v in raw.items():
-        normalized[k] = v[0] if isinstance(v, list) and len(v) == 1 else v
-    return normalized
+# 引入共享工具
+sys.path.insert(0, str(Path(__file__).parent))
+from utils import load_config, safe_lark_run, get_record, parse_views_wan
 
 
 def extract_dim(text: str, marker: str) -> str:
@@ -151,7 +134,7 @@ def build_page_markdown(
     date = str(record.get('发布日期', ''))[:10]
     duration = record.get('时长（分钟）', '?')
     views = record.get('YouTube播放量', 0)
-    views_wan = f"{int(views) // 10000}万" if views else '?万'
+    views_wan = parse_views_wan(views)
     topic = record.get('主题分类', '科技&AI')
     cn_title = record.get('中文标题', '')
 
@@ -251,16 +234,15 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
         transcript_part = ""
 
     print("[飞书] 创建页面（头部 + 五维 + 金句）...")
-    result = subprocess.run([
+    data = safe_lark_run([
         "lark-cli", "docs", "+create",
         "--wiki-node", wiki_node,
         "--title", title,
         "--markdown", header_part
-    ], capture_output=True, text=True)
+    ], action="创建飞书 Wiki 页面")
 
-    data = json.loads(result.stdout)
-    if not data.get("ok"):
-        raise RuntimeError(f"页面创建失败: {result.stdout}")
+    if data is None:
+        return ""
 
     doc_token = data["data"]["doc_id"]
     wiki_url = data["data"].get("doc_url") or f"https://www.feishu.cn/wiki/{doc_token}"
@@ -271,22 +253,29 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
         seg_blocks = re.split(r'\n(?=\*\*\[)', transcript_part)
         batch_size = 4
         total_batches = (len(seg_blocks) + batch_size - 1) // batch_size
+        failed_batches = []
         for i in range(0, len(seg_blocks), batch_size):
             batch = '\n'.join(seg_blocks[i:i+batch_size])
             batch_num = i // batch_size + 1
             print(f"[飞书] 追加逐字稿 {batch_num}/{total_batches}...")
-            r = subprocess.run([
+            r = safe_lark_run([
                 "lark-cli", "docs", "+update",
                 "--doc", wiki_url,
                 "--mode", "append",
                 "--markdown", batch
-            ], capture_output=True, text=True)
-            if not json.loads(r.stdout).get("ok"):
-                print(f"       ⚠️ 批次 {batch_num} 写入失败: {r.stdout[:100]}")
+            ], action=f"追加逐字稿批次 {batch_num}/{total_batches}")
+            if r is None:
+                failed_batches.append(batch_num)
+
+        if failed_batches:
+            print(f"  ⚠️  逐字稿写入部分失败：批次 {failed_batches}（共 {total_batches} 批）")
+            print(f"       请检查飞书页面是否内容完整，必要时手动补录")
+        else:
+            print(f"  ✅  逐字稿全部写入完成（{total_batches} 批次）")
 
     # 回填收件表
     print("[飞书] 回填收件表...")
-    subprocess.run([
+    r = safe_lark_run([
         "lark-cli", "base", "+record-upsert",
         "--base-token", config["all_in_podcast"]["base_token"],
         "--table-id", config["all_in_podcast"]["table_id"],
@@ -296,7 +285,11 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
             "翻译状态": "已完成",
             "注释状态": "已完成"
         })
-    ], capture_output=True, text=True)
+    ], action="回填收件表")
+    if r:
+        print("  ✅  收件表已回填")
+    else:
+        print("  ⚠️  收件表回填失败，请手动更新「飞书页面URL」字段")
 
     return wiki_url
 
@@ -358,17 +351,33 @@ def main():
 
     # 写入飞书
     wiki_dirs = config["all_in_podcast"]["wiki"]["directories"]
-    topic_dirs = wiki_dirs.get(topic, wiki_dirs["科技&AI"])
-    wiki_node = (
-        topic_dirs.get(year)
-        or topic_dirs.get("2026")
-        or topic_dirs.get("2025")
-        or topic_dirs.get("root")
-        or wiki_dirs["科技&AI"]["2026"]
-    ) if isinstance(topic_dirs, dict) else wiki_dirs["科技&AI"]["2026"]
+    topic_dirs = wiki_dirs.get(topic, {})
+    if not topic_dirs:
+        print(f"  ⚠️  主题分类「{topic}」在 config 中未找到，使用「科技&AI」作为默认")
+        topic_dirs = wiki_dirs.get("科技&AI", {})
+
+    default_node = wiki_dirs.get("科技&AI", {}).get("2026", "")
+    if not default_node:
+        print("  ❌  config.json 缺少默认 wiki 节点（科技&AI/2026），请检查配置")
+        sys.exit(1)
+
+    if isinstance(topic_dirs, dict):
+        wiki_node = (
+            topic_dirs.get(year)
+            or topic_dirs.get("2026")
+            or topic_dirs.get("2025")
+            or topic_dirs.get("root")
+            or default_node
+        )
+    else:
+        wiki_node = default_node
 
     title = f"{episode} · {cn_title}"
     wiki_url = write_to_feishu(config, wiki_node, title, page_md, args.record_id)
+
+    if not wiki_url:
+        print("\n❌ 飞书页面创建失败，流程中止")
+        sys.exit(1)
 
     print(f"\n✅ 完成！")
     print(f"   页面：{wiki_url}")

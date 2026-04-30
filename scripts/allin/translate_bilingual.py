@@ -60,9 +60,14 @@ All In Podcast 是一档硅谷顶级投资人对谈节目，四位主播是：
 def translate_segment(client: OpenAI, segment: dict, retry: int = 3) -> dict:
     """翻译单个分段，返回含双语句子的分段"""
 
+    # 检查 sentences 字段（断点续传时已翻译段为 None）
+    sentences = segment.get('sentences')
+    if not sentences:
+        return segment  # 已翻译，直接返回
+
     # 准备发给模型的文本
     lines = []
-    for sent in segment['sentences']:
+    for sent in sentences:
         prefix = ">> " if sent['speaker_change'] else ""
         lines.append(f"{prefix}{sent['text']}")
 
@@ -115,8 +120,17 @@ def main():
 
     api_key = os.environ.get('ARK_API_KEY')
     if not api_key:
-        print("❌ 缺少 ARK_API_KEY 环境变量")
-        print("   运行: export ARK_API_KEY=your_key_here")
+        # 尝试从 config.json 读取
+        try:
+            config_path = Path.home() / '.agents/skills/lark-knowledge-config/config.json'
+            cfg = json.loads(config_path.read_text(encoding='utf-8'))
+            api_key = cfg.get('ark_api_key') or cfg.get('ARK_API_KEY')
+        except Exception:
+            pass
+    if not api_key:
+        print("❌ 缺少 ARK_API_KEY")
+        print("   方式一：export ARK_API_KEY=your_key_here")
+        print("   方式二：在 config.json 中添加 \"ark_api_key\": \"your_key_here\"")
         sys.exit(1)
 
     client = OpenAI(api_key=api_key, base_url=ARK_BASE_URL)
@@ -129,6 +143,10 @@ def main():
     results = []
     if args.start_from > 0 and Path(args.output).exists():
         existing = json.loads(Path(args.output).read_text(encoding='utf-8'))
+        if len(existing) < args.start_from:
+            print(f"  ⚠️  警告：已有 {len(existing)} 段，但 --start-from={args.start_from}")
+            print(f"       调整为从第 {len(existing)} 段继续，避免数据空洞")
+            args.start_from = len(existing)
         results = existing[:args.start_from]
         print(f"[续传] 已加载前 {len(results)} 段")
 

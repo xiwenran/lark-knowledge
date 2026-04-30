@@ -31,15 +31,50 @@ if [ -z "$YOUTUBE_URL" ] || [ -z "$RECORD_ID" ]; then
 fi
 
 if [ -z "$ARK_API_KEY" ]; then
-  echo "❌ 缺少 ARK_API_KEY 环境变量"
-  echo "   运行: export ARK_API_KEY=your_key_here"
+  # 尝试从 config.json 读取
+  ARK_API_KEY=$(python3 -c "
+import json, pathlib, sys
+try:
+    cfg = json.loads(pathlib.Path.home().joinpath('.agents/skills/lark-knowledge-config/config.json').read_text())
+    key = cfg.get('ark_api_key') or cfg.get('ARK_API_KEY') or ''
+    print(key, end='')
+except:
+    pass
+" 2>/dev/null)
+fi
+
+if [ -z "$ARK_API_KEY" ]; then
+  echo "❌ 缺少 ARK_API_KEY"
+  echo "   方式一：export ARK_API_KEY=your_key_here"
+  echo "   方式二：在 config.json 中添加 \"ark_api_key\": \"your_key_here\""
   exit 1
 fi
 
-# 提取视频 ID（支持 ?v=xxx 和 youtu.be/xxx 两种格式）
-VIDEO_ID=$(echo "$YOUTUBE_URL" | grep -oP '(?<=v=)[^&]+' 2>/dev/null || \
-           echo "$YOUTUBE_URL" | grep -oP '(?<=youtu.be/)[^?]+' 2>/dev/null || \
-           echo "unknown")
+# 提取视频 ID（支持 ?v=xxx / youtu.be/xxx / /shorts/xxx / /live/xxx / /embed/xxx）
+VIDEO_ID=$(python3 -c "
+import re, sys
+url = sys.argv[1]
+patterns = [
+    r'[?&]v=([^&]+)',
+    r'youtu\.be/([^?/]+)',
+    r'youtube\.com/shorts/([^?/]+)',
+    r'youtube\.com/live/([^?/]+)',
+    r'youtube\.com/embed/([^?/]+)',
+]
+for p in patterns:
+    m = re.search(p, url)
+    if m:
+        print(m.group(1))
+        sys.exit(0)
+print('unknown')
+" "$YOUTUBE_URL")
+
+if [ "\$VIDEO_ID" = "unknown" ]; then
+  echo "❌ 无法从 URL 提取视频 ID，请检查 YouTube 链接格式"
+  echo "   支持格式：?v=xxx / youtu.be/xxx / /shorts/xxx / /live/xxx"
+  exit 1
+fi
+
 WORK_DIR="/tmp/allin_${VIDEO_ID}"
 mkdir -p "$WORK_DIR"
 

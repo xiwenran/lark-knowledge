@@ -34,28 +34,10 @@ SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TEMPLATE_DIR = REPO_ROOT / "templates" / "allin-kami"
 TEMPLATE_HTML = TEMPLATE_DIR / "episode.html"
-CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
-# (Chrome 路径已移除，渲染引擎改为 WeasyPrint)
-
-
-def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-
-
-def get_record(config: dict, record_id: str) -> dict:
-    """从飞书收件表读取记录，数组类型字段自动取第一个值"""
-    result = subprocess.run([
-        "lark-cli", "base", "+record-get",
-        "--base-token", config["all_in_podcast"]["base_token"],
-        "--table-id", config["all_in_podcast"]["table_id"],
-        "--record-id", record_id
-    ], capture_output=True, text=True)
-    raw = json.loads(result.stdout)["data"]["record"]
-    normalized = {}
-    for k, v in raw.items():
-        normalized[k] = v[0] if isinstance(v, list) and len(v) == 1 else v
-    return normalized
+# 引入共享工具
+sys.path.insert(0, str(SCRIPT_DIR))
+from utils import load_config, safe_lark_run, get_record, parse_views_wan
 
 
 def extract_dim(text: str, marker: str) -> str:
@@ -322,7 +304,7 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     date = str(record.get('发布日期', ''))[:10]
     duration = record.get('时长（分钟）', '?')
     views = record.get('YouTube播放量', 0)
-    views_wan = f"{int(views) // 10000}万" if views else '?万'
+    views_wan = parse_views_wan(views)
     topic = record.get('主题分类', '科技&AI')
     cn_title = record.get('中文标题', '未知标题')
 
@@ -383,13 +365,17 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     # 替换精华金句区域（固定3个占位符 → 动态内容）
     quote_section_pattern = r'<!-- 复制以下块 3-5 次 -->.*?<hr class="section-rule page-break">'
     new_quote_section = quotes_html + '\n\n  <hr class="section-rule page-break">'
-    html = re.sub(quote_section_pattern, new_quote_section, html, flags=re.DOTALL)
+    new_html = re.sub(quote_section_pattern, new_quote_section, html, flags=re.DOTALL)
+    if new_html == html:
+        print("  ⚠️  警告：精华金句模板区块未找到，请检查 episode.html 模板是否被修改")
+    html = new_html
 
     # 替换逐字稿示例段落
     transcript_placeholder_pattern = r'<!-- 示例段落（生产时替换） -->.*?<hr class="section-rule">'
-    html = re.sub(transcript_placeholder_pattern,
-                  transcript_html,
-                  html, flags=re.DOTALL)
+    new_html = re.sub(transcript_placeholder_pattern, transcript_html, html, flags=re.DOTALL)
+    if new_html == html:
+        print("  ⚠️  警告：逐字稿模板区块未找到，请检查 episode.html 模板是否被修改")
+    html = new_html
 
     # 修正 CSS 路径为绝对路径（WeasyPrint 需要 file:// 路径）
     css_abs = str(TEMPLATE_DIR / "styles.css")
@@ -404,15 +390,12 @@ def upload_pdf_to_drive(config: dict, pdf_path: Path) -> str:
     cmd = ["lark-cli", "drive", "+upload", "--file", str(pdf_path)]
     if folder_token:
         cmd += ["--folder-token", folder_token]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    try:
-        data = json.loads(result.stdout)
-        if data.get("ok"):
-            file_token = data["data"]["file_token"]
+    data = safe_lark_run(cmd, action=f"上传 {pdf_path.name}")
+    if data:
+        file_token = data.get("data", {}).get("file_token", "")
+        if file_token:
             return f"https://www.feishu.cn/file/{file_token}"
-    except Exception:
-        pass
-    print(f"  ⚠️  上传失败: {result.stdout[:200]}")
+        print(f"  ⚠️  上传响应中无 file_token: {data}")
     return ""
 
 
@@ -429,39 +412,33 @@ def update_wiki_downloads(wiki_url: str, annotated_url: str, original_url: str):
     download_md = "\n\n".join(lines)
 
     # 用唯一占位符做精确替换
-    r = subprocess.run([
+    r1 = safe_lark_run([
         "lark-cli", "docs", "+update",
         "--doc", wiki_url,
         "--mode", "replace_range",
         "--selection-with-ellipsis", "（PDF链接待上传）...（PDF链接待上传）",
         "--markdown", download_md
-    ], capture_output=True, text=True)
+    ], action="更新页面下载链接（replace_range）")
 
-    try:
-        if json.loads(r.stdout).get("ok"):
-            print(f"       ✅ 下载链接已更新到飞书页面")
-            return
-    except Exception:
-        pass
+    if r1:
+        print(f"       ✅ 下载链接已更新到飞书页面")
+        return
 
     # 备用：在「📥 下载资源」标题后插入
-    r2 = subprocess.run([
+    r2 = safe_lark_run([
         "lark-cli", "docs", "+update",
         "--doc", wiki_url,
         "--mode", "insert_after",
         "--selection-with-ellipsis", "📥 下载资源...📥 下载资源",
         "--markdown", download_md
-    ], capture_output=True, text=True)
+    ], action="更新页面下载链接（insert_after）")
 
-    try:
-        if json.loads(r2.stdout).get("ok"):
-            print(f"       ✅ 下载链接已插入飞书页面（备用方式）")
-        else:
-            print(f"       ⚠️  飞书页面更新失败，请手动粘贴:")
-            for line in lines:
-                print(f"          {line}")
-    except Exception:
-        print(f"       ⚠️  飞书页面更新失败: {r2.stdout[:100]}")
+    if r2:
+        print(f"       ✅ 下载链接已插入飞书页面（备用方式）")
+    else:
+        print(f"       ⚠️  飞书页面自动更新失败，请手动粘贴以下链接到「📥 下载资源」区块：")
+        for line in lines:
+            print(f"          {line}")
 
 
 def html_to_pdf(html_path: str, pdf_path: str) -> bool:
@@ -585,14 +562,17 @@ def main():
                     upload_links.get("original", "")
                 )
                 # 回填收件表 PDF 状态
-                subprocess.run([
+                r = safe_lark_run([
                     "lark-cli", "base", "+record-upsert",
                     "--base-token", config["all_in_podcast"]["base_token"],
                     "--table-id", config["all_in_podcast"]["table_id"],
                     "--record-id", args.record_id,
                     "--json", json.dumps({"PDF状态": "已完成"})
-                ], capture_output=True, text=True)
-                print(f"       ✅ 收件表 PDF状态 已更新")
+                ], action="回填收件表 PDF状态")
+                if r:
+                    print(f"       ✅ 收件表 PDF状态 已更新")
+                else:
+                    print(f"       ⚠️  PDF状态 回填失败，请手动在收件表标记")
             else:
                 print(f"\n⚠️  收件表中暂无「飞书页面URL」，跳过下载链接更新")
                 print(f"   请先运行 build_feishu_page.py 生成飞书页面，再重跑此步骤")
