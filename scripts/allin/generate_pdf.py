@@ -94,8 +94,8 @@ def parse_bilingual_segment(text: str) -> list:
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        # 找 EN 行：以 > 开头，说话人有无加粗均可
-        en_m = re.match(r'>\s*\*{0,2}([^*:\n>]+?)\*{0,2}\s*[：:]\s*(.*)', line)
+        # 找 EN 行：以 > 开头，说话人有无加粗均可，支持 >> 占位符
+        en_m = re.match(r'>\s*\*{0,2}([^*:\n]{1,30}?)\*{0,2}\s*[：:]\s*(.*)', line)
         if en_m:
             speaker_en = en_m.group(1).strip()
             en_text = en_m.group(2).strip()
@@ -127,8 +127,10 @@ def parse_bilingual_segment(text: str) -> list:
                         zh_text += ' ' + nxt
                         k += 1
                     j = k
-            # 去掉说话人名中残留的 : 或 ：
+            # 去掉说话人名中残留的 : 或 ：；>> 归一化为主播
             speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
+            if speaker == '>>':
+                speaker = '主播'
             turns.append({
                 'speaker': speaker,
                 'en': en_text.strip(),

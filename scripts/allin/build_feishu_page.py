@@ -56,8 +56,8 @@ def parse_bilingual_turns(text: str) -> list:
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        # 匹配 EN 行：> [**]Speaker[**]: text（说话人有无加粗均可）
-        en_m = re.match(r'>\s*\*{0,2}([^*:\n>]+?)\*{0,2}\s*[：:]\s*(.*)', line)
+        # 匹配 EN 行：> [**]Speaker[**]: text（说话人有无加粗均可，支持 >> 占位符）
+        en_m = re.match(r'>\s*\*{0,2}([^*:\n]{1,30}?)\*{0,2}\s*[：:]\s*(.*)', line)
         if en_m:
             speaker_en = en_m.group(1).strip()
             en_text = en_m.group(2).strip()
@@ -86,6 +86,8 @@ def parse_bilingual_turns(text: str) -> list:
                         k += 1
                     j = k
             speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
+            if speaker == '>>':  # Doubao 无法判断说话人时输出 >>，归一化为主播
+                speaker = '主播'
             turns.append({'speaker': speaker, 'en': en_text.strip(), 'zh': zh_text.strip()})
             i = j
         else:
