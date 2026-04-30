@@ -183,6 +183,18 @@ def feishu_to_html(text: str) -> str:
     return ''.join(result)
 
 
+def extract_callouts(text: str):
+    """从文本中提取 <callout> 块，返回 (clean_text, [callout_html_list])"""
+    callouts = []
+
+    def _collect(m):
+        callouts.append(m.group(1).strip())
+        return ''
+
+    clean = re.sub(r'<callout[^>]*>(.*?)</callout>', _collect, text, flags=re.DOTALL)
+    return clean.strip(), callouts
+
+
 def build_transcript_html(segments: list, annotations: dict, include_annotations: bool) -> str:
     """生成逐字稿 HTML"""
     parts = []
@@ -196,27 +208,35 @@ def build_transcript_html(segments: list, annotations: dict, include_annotations
         if turns:
             for turn in turns:
                 speaker = escape_html(turn['speaker'])
-                zh = escape_html(turn['zh'])
+                # 提取 zh 中的 callout 块，避免原样显示飞书标签
+                zh_raw, turn_callouts = extract_callouts(turn.get('zh', ''))
+                zh = escape_html(zh_raw)
                 parts.append(
                     f'<p class="zh-para"><span class="speaker">{speaker}：</span>{zh}</p>'
                 )
+                # 英文原文紧跟在该条发言之后（逐条显示）
+                en = turn.get('en', '').strip()
+                if en:
+                    parts.append(f'<span class="en-text">{escape_html(en)}</span>')
+                # 嵌入 callout 注释（附着在对应发言下方）
+                if include_annotations and turn_callouts:
+                    for callout in turn_callouts:
+                        parts.append(
+                            f'<div class="annotation no-break">{escape_html(callout)}</div>'
+                        )
 
-            # 注释
+            # analysis.json 中的段级注释（仍保留）
             if include_annotations:
                 seg_annotations = annotations.get(time_label, [])
                 for ann in seg_annotations:
                     parts.append(
                         f'<div class="annotation no-break">{escape_html(ann)}</div>'
                     )
-
-            # 英文原文（合并为一块，折叠显示）
-            en_texts = [t['en'] for t in turns if t.get('en')]
-            if en_texts:
-                en_combined = ' '.join(en_texts)
-                parts.append(f'<span class="en-text">{escape_html(en_combined)}</span>')
         else:
-            # 解析失败时直接显示原文
-            parts.append(f'<p class="zh-para">{escape_html(translated[:300])}…</p>')
+            # 解析失败时直接显示原文（去掉飞书标签）
+            clean_text, _ = extract_callouts(translated)
+            clean_text = re.sub(r'<text color="[^"]+">|</text>', '', clean_text)
+            parts.append(f'<p class="zh-para">{escape_html(clean_text[:400])}…</p>')
 
         parts.append('<hr class="section-rule">')
 
@@ -346,12 +366,12 @@ def html_to_pdf(html_path: str, pdf_path: str) -> bool:
 
     cmd = [
         chrome,
-        "--headless=new",
+        "--headless",          # 旧版 headless，--print-to-pdf-no-header 在此模式更可靠
         "--print-to-pdf=" + pdf_path,
         "--print-to-pdf-no-header",
         "--no-sandbox",
         "--disable-gpu",
-        "--run-all-compositor-stages-before-draw",
+        "--disable-software-rasterizer",
         "file://" + html_path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
