@@ -5,9 +5,12 @@ utils.py — All In Podcast 脚本共享工具函数
 统一处理：
 - lark-cli 命令调用（带错误处理）
 - 飞书收件表记录读取
+- 双语解析（Doubao 输出格式 → [{speaker, en, zh}]）
+- 五维分析提取
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -64,6 +67,71 @@ def get_record(config: dict, record_id: str) -> dict:
     for k, v in raw.items():
         normalized[k] = v[0] if isinstance(v, list) and len(v) == 1 else v
     return normalized
+
+
+def extract_dim(text: str, marker: str) -> str:
+    """从五维分析文本提取单个维度内容，兼容两种 AI 输出格式：
+    格式1（内容在下一行）：① 议题背景\\n内容...
+    格式2（内容在同行）： ① 议题背景：内容...
+    """
+    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
+    return m.group(1).strip() if m else ''
+
+
+def parse_bilingual_turns(text: str) -> list:
+    """解析 Doubao 双语输出，返回 [{speaker, en, zh}]
+
+    支持的 EN 行格式（Doubao-seed-2.0-pro 实际输出）：
+      > Speaker: EN text        （无加粗）
+      > **Speaker**: EN text    （有加粗，兼容旧格式）
+      > >>: EN text             （无法判断说话人，归一化为"主播"）
+    ZH 行格式：**Speaker**：ZH text
+    """
+    turns = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        # EN 行：> [**]说话人[**]: text（说话人 ≤30 字，支持 >>）
+        en_m = re.match(r'>\s*\*{0,2}([^*:\n]{1,30}?)\*{0,2}\s*[：:]\s*(.*)', line)
+        if en_m:
+            speaker_en = en_m.group(1).strip()
+            en_text = en_m.group(2).strip()
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j].strip()
+                if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                    break
+                en_text += ' ' + nxt
+                j += 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            zh_text = ''
+            speaker = speaker_en
+            if j < len(lines):
+                zh_m = re.match(r'\*\*([^*]+)\*\*[：:]\s*(.*)', lines[j].strip())
+                if zh_m:
+                    speaker = zh_m.group(1).strip()
+                    zh_text = zh_m.group(2).strip()
+                    k = j + 1
+                    while k < len(lines):
+                        nxt = lines[k].strip()
+                        if not nxt or nxt.startswith('>') or nxt.startswith('**'):
+                            break
+                        zh_text += ' ' + nxt
+                        k += 1
+                    j = k
+            speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
+            if speaker == '>>':
+                speaker = '主播'
+            turns.append({'speaker': speaker, 'en': en_text.strip(), 'zh': zh_text.strip()})
+            i = j
+        else:
+            i += 1
+    return turns
 
 
 def parse_views_wan(views) -> str:

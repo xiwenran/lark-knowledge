@@ -37,18 +37,7 @@ TEMPLATE_HTML = TEMPLATE_DIR / "episode.html"
 
 # 引入共享工具
 sys.path.insert(0, str(SCRIPT_DIR))
-from utils import load_config, safe_lark_run, get_record, parse_views_wan
-
-
-def extract_dim(text: str, marker: str) -> str:
-    """从五维分析文本提取单个维度内容（兼容同行格式和下一行格式）"""
-    # 格式1：内容在下一行（多行段落）
-    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
-    if m and m.group(1).strip():
-        return m.group(1).strip()
-    # 格式2：内容在 ：/: 后的同一行
-    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
-    return m.group(1).strip() if m else ''
+from utils import load_config, safe_lark_run, get_record, parse_views_wan, extract_dim, parse_bilingual_turns as parse_bilingual_segment
 
 
 def parse_quotes(quotes_text: str) -> list:
@@ -78,68 +67,6 @@ def parse_quotes(quotes_text: str) -> list:
             zh, speaker = second, ''
         quotes.append({'en': en, 'zh': zh.strip(), 'speaker': speaker.strip()})
     return quotes
-
-
-def parse_bilingual_segment(text: str) -> list:
-    """
-    解析 Doubao 输出的双语段落，返回 [{speaker, en, zh}] 列表
-    健壮版：逐行扫描，支持多行英文、空行间隔、多种冒号格式
-    支持格式：
-      > Speaker: EN text       （无加粗，Doubao-seed 实际输出）
-      > **Speaker**: EN text   （有加粗，兼容旧格式）
-    中文行：**Speaker**：CN text
-    """
-    turns = []
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        # 找 EN 行：以 > 开头，说话人有无加粗均可，支持 >> 占位符
-        en_m = re.match(r'>\s*\*{0,2}([^*:\n]{1,30}?)\*{0,2}\s*[：:]\s*(.*)', line)
-        if en_m:
-            speaker_en = en_m.group(1).strip()
-            en_text = en_m.group(2).strip()
-            j = i + 1
-            # 收集多行英文（直到空行或 ** 行或 > 行）
-            while j < len(lines):
-                nxt = lines[j].strip()
-                if not nxt or nxt.startswith('>') or nxt.startswith('**'):
-                    break
-                en_text += ' ' + nxt
-                j += 1
-            # 跳过空行
-            while j < len(lines) and not lines[j].strip():
-                j += 1
-            # 找 ZH 行：**Speaker**：text
-            zh_text = ''
-            speaker = speaker_en
-            if j < len(lines):
-                zh_m = re.match(r'\*\*([^*]+)\*\*[：:]\s*(.*)', lines[j].strip())
-                if zh_m:
-                    speaker = zh_m.group(1).strip()
-                    zh_text = zh_m.group(2).strip()
-                    k = j + 1
-                    # 收集多行中文
-                    while k < len(lines):
-                        nxt = lines[k].strip()
-                        if not nxt or nxt.startswith('>') or nxt.startswith('**'):
-                            break
-                        zh_text += ' ' + nxt
-                        k += 1
-                    j = k
-            # 去掉说话人名中残留的 : 或 ：；>> 归一化为主播
-            speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
-            if speaker == '>>':
-                speaker = '主播'
-            turns.append({
-                'speaker': speaker,
-                'en': en_text.strip(),
-                'zh': zh_text.strip()
-            })
-            i = j
-        else:
-            i += 1
-    return turns
 
 
 def escape_html(text: str) -> str:
@@ -263,7 +190,7 @@ def build_transcript_html(segments: list, annotations: dict,
                 if include_annotations and turn_callouts:
                     for callout in turn_callouts:
                         parts.append(
-                            f'<div class="annotation no-break">{escape_html(callout)}</div>'
+                            f'<div class="annotation no-break">{feishu_to_html(callout)}</div>'
                         )
 
             # analysis.json 中的段级注释（仍保留）
@@ -271,7 +198,7 @@ def build_transcript_html(segments: list, annotations: dict,
                 seg_annotations = annotations.get(time_label, [])
                 for ann in seg_annotations:
                     parts.append(
-                        f'<div class="annotation no-break">{escape_html(ann)}</div>'
+                        f'<div class="annotation no-break">{feishu_to_html(ann)}</div>'
                     )
         else:
             # 解析失败时直接显示原文（去掉飞书标签），不截断
@@ -372,19 +299,22 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
 
     html = template
     for k, v in replacements.items():
-        html = html.replace(k, v)
+        new_html_tmp = html.replace(k, v)
+        if new_html_tmp == html:
+            print(f"  ⚠️  警告：模板占位符 {k} 未找到，请检查 episode.html 模板是否被修改")
+        html = new_html_tmp
 
     # 替换精华金句区域（固定3个占位符 → 动态内容）
     quote_section_pattern = r'<!-- 复制以下块 3-5 次 -->.*?<hr class="section-rule page-break">'
     new_quote_section = quotes_html + '\n\n  <hr class="section-rule page-break">'
-    new_html = re.sub(quote_section_pattern, new_quote_section, html, flags=re.DOTALL)
+    new_html = re.sub(quote_section_pattern, lambda _: new_quote_section, html, flags=re.DOTALL)
     if new_html == html:
         print("  ⚠️  警告：精华金句模板区块未找到，请检查 episode.html 模板是否被修改")
     html = new_html
 
     # 替换逐字稿示例段落
     transcript_placeholder_pattern = r'<!-- 示例段落（生产时替换） -->.*?<hr class="section-rule">'
-    new_html = re.sub(transcript_placeholder_pattern, transcript_html, html, flags=re.DOTALL)
+    new_html = re.sub(transcript_placeholder_pattern, lambda _: transcript_html, html, flags=re.DOTALL)
     if new_html == html:
         print("  ⚠️  警告：逐字稿模板区块未找到，请检查 episode.html 模板是否被修改")
     html = new_html
@@ -565,7 +495,9 @@ def main():
                 print(f"       {url}")
 
         if upload_links:
-            wiki_url = record.get("飞书页面URL", "")
+            # 重新读取收件表，获取 build_feishu_page.py 写入的飞书页面URL（可能比本次早写入）
+            fresh_record = get_record(config, args.record_id)
+            wiki_url = fresh_record.get("飞书页面URL", "") or record.get("飞书页面URL", "")
             if wiki_url:
                 print(f"\n[飞书] 更新页面下载链接...")
                 update_wiki_downloads(

@@ -29,70 +29,8 @@ from pathlib import Path
 
 # 引入共享工具
 sys.path.insert(0, str(Path(__file__).parent))
-from utils import load_config, safe_lark_run, get_record, parse_views_wan
+from utils import load_config, safe_lark_run, get_record, parse_views_wan, extract_dim, parse_bilingual_turns
 
-
-def extract_dim(text: str, marker: str) -> str:
-    """从五维分析文本提取单个维度内容（兼容同行格式和下一行格式）"""
-    # 格式1：内容在下一行（多行段落）
-    m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
-    if m and m.group(1).strip():
-        return m.group(1).strip()
-    # 格式2：内容在 ：/: 后的同一行
-    m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
-    return m.group(1).strip() if m else ''
-
-
-def parse_bilingual_turns(text: str) -> list:
-    """
-    解析双语发言，返回 [{speaker, en, zh}]
-    支持 Doubao 输出的两种格式：
-      > Speaker: EN text       （无加粗，Doubao-seed 实际输出）
-      > **Speaker**: EN text   （有加粗，兼容旧格式）
-    中文行格式：**Speaker**：ZH text
-    """
-    turns = []
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        # 匹配 EN 行：> [**]Speaker[**]: text（说话人有无加粗均可，支持 >> 占位符）
-        en_m = re.match(r'>\s*\*{0,2}([^*:\n]{1,30}?)\*{0,2}\s*[：:]\s*(.*)', line)
-        if en_m:
-            speaker_en = en_m.group(1).strip()
-            en_text = en_m.group(2).strip()
-            j = i + 1
-            while j < len(lines):
-                nxt = lines[j].strip()
-                if not nxt or nxt.startswith('>') or nxt.startswith('**'):
-                    break
-                en_text += ' ' + nxt
-                j += 1
-            while j < len(lines) and not lines[j].strip():
-                j += 1
-            zh_text = ''
-            speaker = speaker_en
-            if j < len(lines):
-                zh_m = re.match(r'\*\*([^*]+)\*\*[：:]\s*(.*)', lines[j].strip())
-                if zh_m:
-                    speaker = zh_m.group(1).strip()
-                    zh_text = zh_m.group(2).strip()
-                    k = j + 1
-                    while k < len(lines):
-                        nxt = lines[k].strip()
-                        if not nxt or nxt.startswith('>') or nxt.startswith('**'):
-                            break
-                        zh_text += ' ' + nxt
-                        k += 1
-                    j = k
-            speaker = re.sub(r'[：:]\s*$', '', speaker).strip()
-            if speaker == '>>':  # Doubao 无法判断说话人时输出 >>，归一化为主播
-                speaker = '主播'
-            turns.append({'speaker': speaker, 'en': en_text.strip(), 'zh': zh_text.strip()})
-            i = j
-        else:
-            i += 1
-    return turns
 
 
 def build_transcript_section(segments: list, annotations: dict) -> str:
@@ -229,6 +167,7 @@ def build_page_markdown(
 
 ## <text color="blue">中英对照逐字稿</text>
 
+<!-- TRANSCRIPT_START -->
 {transcript_md}
 """
     return page
@@ -237,7 +176,7 @@ def build_page_markdown(
 def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, record_id: str) -> str:
     """分批写入飞书 Wiki，返回 wiki URL"""
 
-    split_marker = '## <text color="blue">中英对照逐字稿</text>'
+    split_marker = '<!-- TRANSCRIPT_START -->'
     if split_marker in page_md:
         idx = page_md.index(split_marker)
         header_part = page_md[:idx + len(split_marker)]
@@ -263,7 +202,7 @@ def write_to_feishu(config: dict, wiki_node: str, title: str, page_md: str, reco
 
     # 逐字稿按段分批 append
     if transcript_part.strip():
-        seg_blocks = [b for b in re.split(r'\n(?=\*\*\[)', transcript_part) if b.strip()]
+        seg_blocks = [b for b in re.split(r'\n+(?=\*\*\[)', transcript_part) if b.strip()]
         batch_size = 4
         total_batches = (len(seg_blocks) + batch_size - 1) // batch_size
         failed_batches = []

@@ -288,8 +288,15 @@ def main():
     if Path(ap).exists():
         analysis = json.loads(Path(ap).read_text(encoding='utf-8'))
         print(f"[分析] 加载: {ap}")
+    elif args.prompts_only:
+        # --prompts-only 模式允许没有 analysis.json，用占位符预览提示词
+        print(f"[分析] 未找到 {ap}，将用占位内容（--prompts-only 模式）")
     else:
-        print(f"[分析] 未找到 {ap}，将用占位内容")
+        print(f"❌  未找到分析文件: {ap}")
+        print(f"   手绘笔记需要五维分析和金句才能生成有意义的内容。")
+        print(f"   请先完成 AI 分析步骤（SKILL.md Step 4-6），生成 analysis.json 后再运行。")
+        print(f"   若只想预览提示词，可加 --prompts-only 参数。")
+        sys.exit(1)
 
     pages = build_page_prompts(record, analysis)
     print(f"[规划] 共 {len(pages)} 张：{', '.join(p['title'] for p in pages)}")

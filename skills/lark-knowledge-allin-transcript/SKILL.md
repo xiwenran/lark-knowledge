@@ -244,11 +244,26 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 
 **引用** `../lark-knowledge-format/SKILL.md` 模式 2，执行 **Step 3.9 All In Podcast 专项排版规则**。
 
+> ⚠️ **CRITICAL：overwrite 绝对不能覆盖逐字稿区域**
+>
+> 飞书 `--mode overwrite` 会全页重新解析 Markdown，若把逐字稿（数万字）一起 overwrite 进去：
+> 1. callout 标签会被重新解析，可能导致格式错乱
+> 2. 极大的 Markdown 正文容易触发飞书 API 超时或截断
+>
+> **正确做法**：只 overwrite 页面头部到「精华金句」之间的内容（不含逐字稿），
+> 逐字稿区域（`<!-- TRANSCRIPT_START -->` 之后）保持原样，**一个字都不动**。
+>
+> 操作流程：
+> 1. `lark-cli docs +fetch --doc <wiki_url>` 读取全文
+> 2. 找到 `<!-- TRANSCRIPT_START -->` 分隔符，**只排版其前面的部分**
+> 3. 用 `--mode overwrite` 只更新头部 Markdown（不含逐字稿）
+> 4. 如需修正个别逐字稿段，用 `--mode replace_range` 精确替换单个段落
+
 执行：
 ```bash
 lark-cli docs +fetch --doc <wiki_url>          # 读取页面
-# 按 format skill Step 3.9 规则分区处理（逐字稿段原封不动）
-lark-cli docs +update --doc <wiki_url> --mode overwrite --markdown "<排版后内容>"
+# 只对 <!-- TRANSCRIPT_START --> 之前的内容（头部+五维+金句）做排版
+lark-cli docs +update --doc <wiki_url> --mode overwrite --markdown "<仅头部排版后内容（不含逐字稿）>"
 ```
 
 ---
