@@ -69,16 +69,31 @@ def get_record(config: dict, record_id: str) -> dict:
     return normalized
 
 
+def _strip_dim_heading(text: str) -> str:
+    """去掉维度内容开头的冗余章节标题行。
+
+    Sonnet 有时会在正文内容前加「一、本期议题：」这类子标题行，
+    与模板已有的 ### 标题重复，也会导致概览 callout 里"议题"字样叠加。
+    只去首行，且只匹配「中文序数 + 顿号 + 短标题」格式，不动正文内容。
+    """
+    return re.sub(
+        r'^[一二三四五六七八九十][、，.]\s*[^\n：:]{0,20}[：:]?\s*\n',
+        '', text, count=1
+    ).strip()
+
+
 def extract_dim(text: str, marker: str) -> str:
     """从五维分析文本提取单个维度内容，兼容两种 AI 输出格式：
     格式1（内容在下一行）：① 议题背景\\n内容...
     格式2（内容在同行）： ① 议题背景：内容...
+
+    自动去掉 Sonnet 有时加在正文前的「一、本期议题：」冗余标题行。
     """
     m = re.search(rf'{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)', text, re.DOTALL)
     if m and m.group(1).strip():
-        return m.group(1).strip()
+        return _strip_dim_heading(m.group(1).strip())
     m = re.search(rf'{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)', text, re.DOTALL)
-    return m.group(1).strip() if m else ''
+    return _strip_dim_heading(m.group(1).strip()) if m else ''
 
 
 def parse_bilingual_turns(text: str) -> list:

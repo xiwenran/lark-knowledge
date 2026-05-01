@@ -254,11 +254,13 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
         or record.get('五维分析', '')
         or ''
     )
-    dim1 = extract_dim(five_dim_raw, '①') or '（待补充）'
-    dim2 = extract_dim(five_dim_raw, '②') or '（待补充）'
-    dim3 = extract_dim(five_dim_raw, '③') or '（待补充）'
-    dim4 = extract_dim(five_dim_raw, '④') or '（待补充）'
-    dim5 = extract_dim(five_dim_raw, '⑤') or '（待补充）'
+    # 优先从 five_dim 整体提取；若提取为空，再看 analysis.json 是否有单独 dimX 键
+    # （与 build_feishu_page.py 保持一致，防止 PDF 和飞书页面内容不同步）
+    dim1 = extract_dim(five_dim_raw, '①') or analysis.get('dim1', '（待补充）')
+    dim2 = extract_dim(five_dim_raw, '②') or analysis.get('dim2', '（待补充）')
+    dim3 = extract_dim(five_dim_raw, '③') or analysis.get('dim3', '（待补充）')
+    dim4 = extract_dim(five_dim_raw, '④') or analysis.get('dim4', '（待补充）')
+    dim5 = extract_dim(five_dim_raw, '⑤') or analysis.get('dim5', '（待补充）')
 
     # 精华金句
     quotes_text = analysis.get('quotes', '')
@@ -327,17 +329,41 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
 
 
 def upload_pdf_to_drive(config: dict, pdf_path: Path) -> str:
-    """上传 PDF 到飞书云盘，返回文件分享链接（失败返回空字符串）"""
+    """上传 PDF 到飞书云盘，返回真实的文件分享链接（失败返回空字符串）
+
+    注意：lark-cli drive +upload 只返回 file_token（API 内部 ID），
+    本身没有对应的网页 URL，必须额外调 create_share_link 生成真实分享链接。
+    """
     folder_token = config.get("all_in_podcast", {}).get("pdf_folder_token", "")
     cmd = ["lark-cli", "drive", "+upload", "--file", str(pdf_path)]
     if folder_token:
         cmd += ["--folder-token", folder_token]
     data = safe_lark_run(cmd, action=f"上传 {pdf_path.name}")
-    if data:
-        file_token = data.get("data", {}).get("file_token", "")
-        if file_token:
-            return f"https://www.feishu.cn/file/{file_token}"
+    if not data:
+        return ""
+
+    file_token = data.get("data", {}).get("file_token", "")
+    if not file_token:
         print(f"  ⚠️  上传响应中无 file_token: {data}")
+        return ""
+
+    # 调用飞书 API 创建真实的分享链接（file_token 本身不是可访问 URL）
+    share_data = safe_lark_run([
+        "lark-cli", "api", "POST",
+        f"/open-apis/drive/v1/files/{file_token}/create_share_link",
+        "--params", json.dumps({"file_type": "file"}),
+        "--data", json.dumps({}),
+    ], action=f"创建分享链接 {pdf_path.name}")
+
+    if share_data:
+        link = (share_data.get("data", {}).get("link") or
+                share_data.get("data", {}).get("share_link", ""))
+        if link:
+            return link
+
+    # 创建分享链接失败：告知用户 file_token，可手动在飞书云盘中生成分享链接
+    print(f"  ⚠️  {pdf_path.name} 已上传（file_token={file_token}），但无法自动创建分享链接")
+    print(f"       请在飞书云盘找到该文件，手动点击「分享」→「复制链接」，再粘贴到 Wiki 页面")
     return ""
 
 
