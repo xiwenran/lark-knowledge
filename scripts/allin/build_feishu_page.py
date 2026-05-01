@@ -96,36 +96,41 @@ def parse_bilingual_turns(text: str) -> list:
 
 
 def build_transcript_section(segments: list, annotations: dict) -> str:
-    """组装逐字稿 Markdown，每条发言单独分段，确保飞书正确渲染"""
+    """组装逐字稿 Markdown，每条发言单独分段，确保飞书正确渲染
+
+    注意：飞书 Markdown 解析器遵循标准 Markdown——单 \\n 是软换行（会被忽略），
+    必须用 \\n\\n 才能产生实际段落间距。overwrite 模式全页重解析时尤其关键。
+    """
     parts = []
     for seg in segments:
         time_label = seg.get('time_label', '')
         translated = seg.get('translated', '')
 
         # 章节标题
-        parts.append(f"\n**[{time_label}]**\n")
+        parts.append(f"\n**[{time_label}]**\n\n")
 
-        # 解析双语发言，每条之间加空行确保飞书不合并引用块
+        # 解析双语发言
         turns = parse_bilingual_turns(translated)
         if turns:
             for turn in turns:
                 speaker = turn['speaker']
                 en = turn['en']
                 zh = turn['zh']
-                # 中文在前（粗体主体），英文在后（斜体辅助），无 > 前缀防飞书合并引用块
-                parts.append(f"\n**{speaker}**：{zh}\n")
+                # 英文原文在前（斜体），中文翻译在后（light-gray callout 做视觉区分）
+                # \n\n 确保 overwrite 模式下 Markdown 解析器不合并段落
                 if en:
                     parts.append(f"*{speaker}: {en}*\n\n")
+                parts.append(f"<callout background-color=\"light-gray\">**{speaker}**：{zh}</callout>\n\n")
         else:
-            # 解析失败退路：去掉 > 前缀后直接输出，避免飞书合并引用块
+            # 解析失败退路：去掉 > 前缀后直接输出
             clean = re.sub(r'^>\s*', '', translated, flags=re.MULTILINE)
             parts.append(clean)
 
-        # 章节注释
+        # 章节注释（light-blue，与翻译的 light-gray 区分）
         for ann in annotations.get(time_label, []):
-            parts.append(f"\n<callout background-color=\"light-blue\">{ann}</callout>")
+            parts.append(f"<callout background-color=\"light-blue\">{ann}</callout>\n\n")
 
-        parts.append("\n---\n")
+        parts.append("\n---\n\n")
 
     return '\n'.join(parts)
 

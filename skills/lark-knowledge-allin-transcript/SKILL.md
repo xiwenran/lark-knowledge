@@ -195,28 +195,28 @@ python3 ~/lark-knowledge/scripts/allin/build_feishu_page.py \
 ```markdown
 **[HH:MM:SS–HH:MM:SS]**
 
-**Jason**：中文翻译
-
 *Jason: English original text*
 
-**Chamath**：中文翻译
+<callout background-color="light-gray">**Jason**：中文翻译</callout>
 
 *Chamath: English original text*
+
+<callout background-color="light-gray">**Chamath**：中文翻译</callout>
 
 <callout background-color="light-blue">注释内容，1-2句，自然散文风格</callout>
 ```
 
-> **设计原则**：中文粗体在前（主要阅读层），英文斜体在后（参考层），不用 `> ` 引用块前缀。
-> 飞书会将连续 `> ` 行合并成单一引用块，导致全段被压成一个块——已在 v2.3 移除。
+> **设计原则**：英文原文在前（斜体），中文翻译在后（light-gray callout 灰底），视觉上一眼区分原文与译文。
+> 所有段落间用 `\n\n` 双换行，确保 overwrite 模式重解析时飞书不合并段落。
 
 ### 格式铁律
 
 | 规则 | 执行方式 |
 |------|---------|
 | 章节标题 | `## <text color="blue">标题</text>` |
-| 中文译文 | `**说话人**：译文`（粗体，每条发言首行） |
-| 英文原句 | `*说话人: 原文*`（斜体，中文后紧跟） |
-| 注释块 | `<callout background-color="light-blue">` 无 emoji 无标题 |
+| 英文原句 | `*说话人: 原文*`（斜体，每条发言首行） |
+| 中文译文 | `<callout background-color="light-gray">**说话人**：译文</callout>` |
+| 注释块 | `<callout background-color="light-blue">` 无 emoji 无标题（与译文 gray 区分） |
 | 概览块 | `<callout background-color="light-yellow">` |
 | **禁止** | 逐字稿区域不用 `> ` 引用块前缀（会触发飞书引用合并） |
 | **禁止** | 逐字稿区域不用 `<text color="red/blue/...">` 着色词 |
