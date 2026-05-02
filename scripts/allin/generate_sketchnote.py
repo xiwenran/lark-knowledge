@@ -51,6 +51,7 @@ STYLE_BASE = (
     "米白色背景（#FAFAF7）。手写字体质感，有涂鸦式图标和指示箭头。"
     "竖版 3:4 比例，内容居中，留白充足，最多 4 个主要视觉元素。"
     "底部右下角标注小字：「All In 中文笔记」。不要出现任何英文界面元素，全部用中文。"
+    "【重要】不要在图片任何位置添加页码标识（如「第1页」「第3页」「Page 3」等），页码完全不需要出现。"
 )
 
 
@@ -164,10 +165,36 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
 
     # 第 4 页：四人立场图谱（五维④）—— 有内容才生成
     if dim4:
-        stances = {}
-        for name in ['Chamath', 'Jason', 'Sacks', 'Friedberg']:
-            m = re.search(rf'{name}[：:]\s*([^。\n]{{1,30}})', dim4)
-            stances[name] = m.group(1) if m else '见正文'
+        def _extract_stance(text: str, name: str) -> str:
+            """三层匹配，逐层放宽，确保提取到真实内容而非「见正文」占位符"""
+            # 层1：名字后紧跟冒号（最精确）
+            m = re.search(rf'{name}[：:]\s*([^。\n]{{5,35}})', text)
+            if m:
+                return m.group(1).strip()
+            # 层2：包含名字的句子里，提取名字后面的内容（认为/则/表示/指出等动词格式）
+            m = re.search(
+                rf'{name}[^，。；\n]{{0,12}}(?:认为|表示|指出|则|强调|认定|判断)\s*([^。；\n]{{5,40}})',
+                text
+            )
+            if m:
+                return m.group(1).lstrip('，, ').strip()
+            # 层3：提取含该名字的整句话，截取名字之后的内容
+            for sent in re.split(r'[。；\n]', text):
+                if name in sent:
+                    idx = sent.index(name)
+                    chunk = sent[idx + len(name):].lstrip('则是而：: ，,').strip()
+                    if len(chunk) >= 5:
+                        return (chunk[:35] + '…') if len(chunk) > 35 else chunk
+            return ''
+
+        stances = {name: _extract_stance(dim4, name)
+                   for name in ['Chamath', 'Jason', 'Sacks', 'Friedberg']}
+        # 如果某人立场完全提取不到，用 dim4 首句兜底（至少有内容可读）
+        fallback = extract_bullets(dim4, 1)[0] if dim4 else '（分析见正文）'
+        stance_lines = '\n'.join(
+            f"  · {name} 气泡：{stances[name] or fallback}"
+            for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
+        )
         pages.append({
             'page_num': len(pages) + 1, 'title': '四人立场',
             'prompt': (
@@ -175,10 +202,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
                 f"内容（四人立场图谱）：\n"
                 f"章节大标题（天蓝色手写）：四人怎么看\n"
                 f"四个对话气泡，各写一位主播的核心观点：\n"
-                f"  · Jason 气泡：{stances['Jason']}\n"
-                f"  · Chamath 气泡：{stances['Chamath']}\n"
-                f"  · Sacks 气泡：{stances['Sacks']}\n"
-                f"  · Friedberg 气泡：{stances['Friedberg']}\n"
+                f"{stance_lines}\n"
                 f"版式：四个气泡分布在画面四角，中间是话题词，像对话现场"
             )
         })
