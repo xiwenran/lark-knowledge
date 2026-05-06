@@ -149,26 +149,107 @@ lark-cli docs +fetch --doc "<飞书链接>" --format markdown
 
 ---
 
-## Step 3: 输出与确认
+## Step 3: 配图打包
 
-直接展示完整笔记供用户确认：
+根据内容类型，自动准备配图素材：
+
+### 3a — 商品拆解型：拆解笔记图
+
+如果 upgrade Step 7 已生成拆解笔记图（`/tmp/sketchnote_<编号>_*.png`），直接使用。
+如果还没有，提示用户「要不要先生成拆解笔记图？」
+
+### 3b — 行业洞察型（All In）：手绘笔记 + PDF 预览截图
+
+**手绘笔记**：查找已生成的 sketchnote 图片（`/tmp/allin_<期号>_sketch_*.png`）。
+
+**PDF 内容预览截图**（产品购买钩子）：
+
+从已生成的 PDF 中截取一页作为预览图，吸引用户购买完整版：
+
+```bash
+# 用 Python 从 PDF 截取指定页面为图片
+python3 -c "
+import fitz  # PyMuPDF
+doc = fitz.open('<PDF路径>')
+# 优先选五维分析概览页（通常第2-3页），或精华金句页
+page = doc[<页码>]
+pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+pix.save('/tmp/allin_<期号>_pdf_preview.png')
+print(f'ok: /tmp/allin_<期号>_pdf_preview.png ({len(pix.tobytes()) // 1024} KB)')
+"
+```
+
+**选哪一页**（按优先级）：
+1. **五维分析概览页** —— 内容密度高、排版好看，展示产品专业度
+2. **精华金句页** —— 吸引力强，读者一眼能感受到价值
+3. **封面页** —— 如果上面两页不好看，封面至少干净整洁
+
+**不选逐字稿页** —— 逐字稿是核心付费内容，截图等于白送。
+
+> 💡 如果 PyMuPDF 未安装，提示用户：`pip3 install PyMuPDF`
+
+### 3c — 经验分享型：按需配图
+
+经验分享型通常不需要自动配图。如果用户有截图或成果图想配，由用户自行提供。
+
+---
+
+## Step 4: 输出与确认
+
+展示完整发布包供用户确认：
+
+### 行业洞察型（All In）输出格式：
 
 ```
 📌 标题：<≤20字标题>
 
 <正文，≤300字>
 
-#标签1 #标签2 #标签3 #标签4 #标签5 #标签6 #标签7 ...
+#标签1 #标签2 #标签3 ... #标签10
+
+---
+📎 配图素材（共 N 张）：
+1. 手绘笔记：/tmp/allin_<期号>_sketch_01_封面.png
+2. 手绘笔记：/tmp/allin_<期号>_sketch_02_核心议题.png
+3. PDF预览：/tmp/allin_<期号>_pdf_preview.png
 ```
 
-用户确认后可直接复制发布。如需调整，按用户反馈修改后重新输出。
+### 商品拆解型输出格式：
+
+```
+📌 标题：<≤20字标题>
+
+<正文，≤300字>
+
+#标签1 #标签2 #标签3 ... #标签10
+
+---
+📎 配图素材（共 N 张）：
+1. 拆解笔记：/tmp/sketchnote_<编号>_01_封面.png
+2. 拆解笔记：/tmp/sketchnote_<编号>_02_商业模式拆解.png
+...
+```
+
+### 经验分享型输出格式：
+
+```
+📌 标题：<≤20字标题>
+
+<正文，≤300字>
+
+#标签1 #标签2 #标签3 ... #标签10
+```
+
+用户确认后可直接复制文字 + 下载图片发布。如需调整，按用户反馈修改后重新输出。
 
 ---
 
 ## 与其他 Skill 的关系
 
 - **lark-knowledge-upgrade**：升级完成的页面可直接作为本 Skill 输入
-- **lark-knowledge-upgrade Step 7**：生成拆解笔记图片后，可配合本 Skill 的文字笔记一起发布（图文搭配）
+- **lark-knowledge-upgrade Step 7**：生成拆解笔记图片，本 Skill 直接引用
+- **lark-knowledge-allin-transcript Step 10**：生成 All In 手绘笔记，本 Skill 直接引用
+- **generate_pdf.py**：生成 All In PDF，本 Skill 从中截取预览图
 
 ## 权限
 
