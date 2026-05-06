@@ -156,30 +156,43 @@ lark-cli docs +fetch --doc "<飞书链接>" --format markdown
 
 ## Step 3: 配图打包
 
-根据内容类型，自动准备配图素材：
+根据内容类型，自动准备配图素材。**所有配图统一输出到子文件夹**：
+
+```
+~/Downloads/AllInPodcast/<期号>_<主题关键词>/
+```
+
+示例：`~/Downloads/AllInPodcast/E270_算力之战/`
+
+> 子文件夹命名规则：期号 + 下划线 + 首段主题关键词（2-4 字），如 `E270_算力之战`、`E265_Chamath狠话`。文件夹不存在时自动创建。
 
 ### 3a — 商品拆解型：拆解笔记图
 
-如果 upgrade Step 7 已生成拆解笔记图（`/tmp/sketchnote_<编号>_*.png`），直接使用。
+如果 upgrade Step 7 已生成拆解笔记图（`/tmp/sketchnote_<编号>_*.png`），**复制到子文件夹**。
 如果还没有，提示用户「要不要先生成拆解笔记图？」
 
 ### 3b — 行业洞察型（All In）：手绘笔记 + PDF 预览截图
 
-**手绘笔记**：查找已生成的 sketchnote 图片（`/tmp/allin_<期号>_sketch_*.png`）。
+**手绘笔记**：查找已生成的 sketchnote 图片（`/tmp/allin_<期号>_sketch_*.png`），**复制到子文件夹**。
 
 **PDF 内容预览截图**（产品购买钩子）：
 
 从已生成的 PDF 中截取一页作为预览图，吸引用户购买完整版：
 
 ```bash
+# 先创建子文件夹
+mkdir -p ~/Downloads/AllInPodcast/<期号>_<主题关键词>
+
 # 用 Python 从 PDF 截取多页为图片
 python3 -c "
 import fitz  # PyMuPDF
+import os
+out_dir = os.path.expanduser('~/Downloads/AllInPodcast/<期号>_<主题关键词>')
 doc = fitz.open('<PDF路径>')
 for idx, page_num in enumerate([<页码1>, <页码2>, <页码3>]):
     page = doc[page_num]
     pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-    out = f'/tmp/allin_<期号>_pdf_preview_{idx+1}.png'
+    out = f'{out_dir}/pdf_preview_{idx+1}.png'
     pix.save(out)
     print(f'ok: {out} ({len(pix.tobytes()) // 1024} KB)')
 "
@@ -215,12 +228,12 @@ AllInPodcast E270聊算力之战，SaaS要凉了
 #标签1 #标签2 #标签3 ... #标签10
 
 ---
-📎 配图素材（共 N 张）：
-1. 手绘笔记：/tmp/allin_<期号>_sketch_01_封面.png
-2. 手绘笔记：/tmp/allin_<期号>_sketch_02_核心议题.png
-3. PDF预览（封面）：/tmp/allin_<期号>_pdf_preview_1.png
-4. PDF预览（五维分析）：/tmp/allin_<期号>_pdf_preview_2.png
-5. PDF预览（精华金句）：/tmp/allin_<期号>_pdf_preview_3.png
+📎 配图素材（~/Downloads/AllInPodcast/E270_算力之战/）：
+1. 手绘笔记：sketch_01_封面.png
+2. 手绘笔记：sketch_02_核心议题.png
+3. PDF预览（封面）：pdf_preview_1.png
+4. PDF预览（五维分析）：pdf_preview_2.png
+5. PDF预览（精华金句）：pdf_preview_3.png
 ```
 
 > 无独立标题字段。正文第一段（≤30 字）即标题预览，直接复制全文发布。
@@ -235,9 +248,9 @@ AllInPodcast E270聊算力之战，SaaS要凉了
 #标签1 #标签2 #标签3 ... #标签10
 
 ---
-📎 配图素材（共 N 张）：
-1. 拆解笔记：/tmp/sketchnote_<编号>_01_封面.png
-2. 拆解笔记：/tmp/sketchnote_<编号>_02_商业模式拆解.png
+📎 配图素材（~/Downloads/AllInPodcast/<编号>_<主题>/）：
+1. 拆解笔记：sketchnote_01_封面.png
+2. 拆解笔记：sketchnote_02_商业模式拆解.png
 ...
 ```
 
