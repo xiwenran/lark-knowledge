@@ -393,9 +393,9 @@ VTT字幕原文
 - 涉及文件：新建 `skills/lark-knowledge-xhs-note/SKILL.md`
 - 触发词：`/小红书笔记`
 - 写作风格：口语化、具体数字、简单直接、举例驱动、结果感强
-- 状态：🚧 进行中
+- 状态：✅ 已完成（commit `cfdbaac`，2026-05-06）
 
 ### P3-J: gen_image.py 代码修复
 - 目标：修复冷眼审查发现的两个瑕疵（import time 位置 + 配置路径统一）
 - 涉及文件：`scripts/shared/gen_image.py`
-- 状态：🚧 进行中
+- 状态：✅ 已完成（commit `cfdbaac`，2026-05-06）
