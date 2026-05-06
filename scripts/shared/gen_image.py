@@ -15,16 +15,27 @@ import os
 import sys
 import base64
 import argparse
+import time
 import urllib.request
 from pathlib import Path
 from openai import OpenAI
+
+# 复用项目统一的配置路径（与 scripts/allin/utils.py 一致）
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "allin"))
+try:
+    from utils import load_config as _load_project_config
+except ImportError:
+    _load_project_config = None
 
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
 
 def load_image_config() -> dict:
-    """从 config.json 读取 image_api 区块"""
-    cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
+    """从 config.json 读取 image_api 区块（优先走项目统一 load_config）"""
+    if _load_project_config:
+        cfg = _load_project_config()
+    else:
+        cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
     img = cfg.get('image_api', {})
     return {
         'key': img.get('key') or os.environ.get('IMAGE_API_KEY', ''),
@@ -43,7 +54,6 @@ def generate(prompt: str, output: str, size: str = "1024x1536",
 
     client = OpenAI(api_key=cfg['key'], base_url=cfg['base_url'])
 
-    import time
     for attempt in range(retry):
         try:
             resp = client.images.generate(
