@@ -294,14 +294,31 @@ python3 ~/lark-knowledge/scripts/allin/generate_pdf.py \
 
 ---
 
-### 🤖 Step 10：生成手绘笔记
+### 🤖 Step 10：生成手绘笔记（Codex 优先 → API fallback）
 
-调用 GPT Image 2（支持第三方中转站）批量生成 5-8 张竖版手绘笔记图：
+**优先方式：派 Codex 生成**
+
+Codex 内置 gpt-image-2 图片生成能力，不消耗用户 API 额度。先用 `--prompts-only` 拿到提示词，再逐张派 Codex：
 
 ```bash
-export IMAGE_API_KEY=your_key
-export IMAGE_API_BASE=https://your-relay.com/v1   # 第三方中转站
+# 先生成提示词
+python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
+  --record-id "<record_id>" --prompts-only
+```
 
+拿到每张图的提示词后，通过 `codex:codex-rescue` 逐张派发：
+```
+目标：用 gpt-image-2 生成一张手绘笔记图片
+提示词：<该张图的完整提示词>
+尺寸：1024x1536
+保存路径：/tmp/allin_<期号>_sketch_0N_<主题>.png
+```
+
+**Fallback：Codex 失败时走 API**
+
+若 Codex 报错（额度不足 / 超时 / 生成失败），改用脚本直接调 API：
+
+```bash
 python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
   --record-id "<record_id>"
 ```
@@ -314,12 +331,6 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
 - **第 3 张（市场判断）**：五维③，数据高亮框
 - **第 4 张（四人立场）**：四个对话气泡
 - **最后 1 张（国内启示）**：五维⑤ + 精华金句 + 账号水印
-
-调试用（不调 API，只看提示词）：
-```bash
-python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
-  --record-id "<record_id>" --prompts-only
-```
 
 ---
 

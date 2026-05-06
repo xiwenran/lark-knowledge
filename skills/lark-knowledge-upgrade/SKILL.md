@@ -299,9 +299,24 @@ lark-cli docs +fetch --doc "<wiki_token>" --format markdown
 - 每张图文字内容控制在 60–100 字以内（图片生成模型对长文本支持有限）
 - 用「拆解/分析/洞察/观察」等中性词，禁止「推荐/种草/必买/安利」
 
-### 7c — 调用图片生成
+### 7c — 调用图片生成（Codex 优先 → API fallback）
 
-逐张调用共享图片生成工具：
+**优先方式：派 Codex 生成**
+
+Codex 内置 gpt-image-2 图片生成能力，不消耗用户 API 额度。逐张派发：
+
+```
+目标：用 gpt-image-2 生成一张手绘拆解笔记图片
+提示词：<风格基底 + 该页内容提示词>
+尺寸：1024x1536
+保存路径：/tmp/sketchnote_<记录编号>_0N_<主题>.png
+```
+
+通过 `codex:codex-rescue` 派发，每张图一个任务，带 `--write`。
+
+**Fallback：Codex 失败时走 API**
+
+若 Codex 报错（额度不足 / 超时 / 生成失败），改用共享图片生成工具：
 
 ```bash
 python3 ~/lark-knowledge/scripts/shared/gen_image.py \
