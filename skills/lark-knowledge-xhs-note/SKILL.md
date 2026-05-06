@@ -167,24 +167,26 @@ lark-cli docs +fetch --doc "<飞书链接>" --format markdown
 从已生成的 PDF 中截取一页作为预览图，吸引用户购买完整版：
 
 ```bash
-# 用 Python 从 PDF 截取指定页面为图片
+# 用 Python 从 PDF 截取多页为图片
 python3 -c "
 import fitz  # PyMuPDF
 doc = fitz.open('<PDF路径>')
-# 优先选五维分析概览页（通常第2-3页），或精华金句页
-page = doc[<页码>]
-pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-pix.save('/tmp/allin_<期号>_pdf_preview.png')
-print(f'ok: /tmp/allin_<期号>_pdf_preview.png ({len(pix.tobytes()) // 1024} KB)')
+for idx, page_num in enumerate([<页码1>, <页码2>, <页码3>]):
+    page = doc[page_num]
+    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+    out = f'/tmp/allin_<期号>_pdf_preview_{idx+1}.png'
+    pix.save(out)
+    print(f'ok: {out} ({len(pix.tobytes()) // 1024} KB)')
 "
 ```
 
-**选哪一页**（按优先级）：
-1. **五维分析概览页** —— 内容密度高、排版好看，展示产品专业度
-2. **精华金句页** —— 吸引力强，读者一眼能感受到价值
-3. **封面页** —— 如果上面两页不好看，封面至少干净整洁
+**截取 3 页**，从以下候选中按优先级选取：
+1. **封面页** —— 干净整洁，第一张图就有品质感
+2. **五维分析概览页** —— 内容密度高、排版好看，展示专业度
+3. **精华金句页** —— 吸引力强，读者一眼能感受到价值
+4. **某一页中英对照逐字稿** —— 只选 1 页展示排版质感，不会泄露完整内容
 
-**不选逐字稿页** —— 逐字稿是核心付费内容，截图等于白送。
+**不能选的**：连续多页逐字稿 —— 等于白送核心付费内容。1 页展示排版是钩子，多页就是赠品了。
 
 > 💡 如果 PyMuPDF 未安装，提示用户：`pip3 install PyMuPDF`
 
@@ -211,7 +213,9 @@ print(f'ok: /tmp/allin_<期号>_pdf_preview.png ({len(pix.tobytes()) // 1024} KB
 📎 配图素材（共 N 张）：
 1. 手绘笔记：/tmp/allin_<期号>_sketch_01_封面.png
 2. 手绘笔记：/tmp/allin_<期号>_sketch_02_核心议题.png
-3. PDF预览：/tmp/allin_<期号>_pdf_preview.png
+3. PDF预览（封面）：/tmp/allin_<期号>_pdf_preview_1.png
+4. PDF预览（五维分析）：/tmp/allin_<期号>_pdf_preview_2.png
+5. PDF预览（精华金句）：/tmp/allin_<期号>_pdf_preview_3.png
 ```
 
 ### 商品拆解型输出格式：
