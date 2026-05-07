@@ -334,6 +334,28 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
 - **第 4 张（四人立场）**：`inner_v2`，四位主播立场图谱
 - **第 5 张（国内启示）**：`inner_v2`，五维⑤ + 精华金句
 
+**样张验证（推荐姿势，节省token+时间）**
+
+历史期先从飞书 Wiki 回拉现有分析：
+
+```bash
+python3 ~/lark-knowledge/scripts/allin/utils.py extract-analysis \
+  --record-id "<record_id>" \
+  --out /tmp/allin_<record_id>_analysis.json
+```
+
+新期直接复用当前流程已有的 `/tmp/allin_<record_id>_analysis.json`。先只生成第 1 张样张确认风格和内容密度：
+
+```bash
+python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
+  --record-id "<record_id>" \
+  --analysis /tmp/allin_<record_id>_analysis.json \
+  --pages 1 \
+  --output-dir /tmp
+```
+
+耗时参考：单张约 3-5 分钟；全 5 张并发约 5-7 分钟。
+
 ---
 
 ## 注意事项

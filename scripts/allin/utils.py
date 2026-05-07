@@ -13,7 +13,9 @@ import json
 import re
 import subprocess
 import sys
+import argparse
 from pathlib import Path
+from urllib.parse import urlparse
 
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
 
@@ -156,3 +158,179 @@ def parse_views_wan(views) -> str:
         return f"{v // 10000}万" if v >= 10000 else str(v)
     except (ValueError, TypeError):
         return '?万'
+
+
+def _run_lark_cli_required(cmd: list, action: str) -> dict:
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        details = result.stderr.strip() or result.stdout.strip()[:300] or f"exit={result.returncode}"
+        raise RuntimeError(f"{action}失败：lark-cli 未返回 JSON。{details}") from exc
+
+    if result.returncode != 0 or not payload.get("ok", False):
+        err = payload.get("msg") or payload.get("error") or result.stderr.strip() or result.stdout.strip()[:300]
+        raise RuntimeError(f"{action}失败：{err}")
+    return payload
+
+
+def _extract_wiki_token(url_or_token: str) -> str:
+    text = str(url_or_token or "").strip()
+    if not text:
+        return ""
+    match = re.search(r'/(?:wiki)/([A-Za-z0-9]+)', text)
+    if match:
+        return match.group(1)
+    parsed = urlparse(text)
+    if parsed.scheme and parsed.path:
+        match = re.search(r'/(?:wiki)/([A-Za-z0-9]+)', parsed.path)
+        return match.group(1) if match else ""
+    return text
+
+
+def _extract_markdown_from_payload(payload: dict) -> str:
+    def walk(value):
+        if isinstance(value, dict):
+            for key in ("markdown", "content", "text"):
+                item = value.get(key)
+                if isinstance(item, str) and item.strip():
+                    return item
+            for item in value.values():
+                found = walk(item)
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for item in value:
+                found = walk(item)
+                if found:
+                    return found
+        return ""
+
+    markdown = walk(payload)
+    if not markdown:
+        raise RuntimeError("读取飞书页面失败：docs +fetch 响应中未找到 markdown/content/text")
+    return markdown
+
+
+def _plain_markdown(text: str) -> str:
+    text = re.sub(r'<text\b[^>]*>', '', text)
+    text = re.sub(r'</text>', '', text)
+    text = re.sub(r'</?callout\b[^>]*>', '', text)
+    text = re.sub(r'^\s*---+\s*$', '', text, flags=re.MULTILINE)
+    return text.strip()
+
+
+def _section_between(markdown: str, heading_pattern: str, next_heading_pattern: str | None = None) -> str:
+    start = re.search(heading_pattern, markdown, re.MULTILINE)
+    if not start:
+        return ""
+    body = markdown[start.end():]
+    if next_heading_pattern:
+        end = re.search(next_heading_pattern, body, re.MULTILINE)
+    else:
+        end = re.search(r'^\s*##\s+', body, re.MULTILINE)
+    if end:
+        body = body[:end.start()]
+    return body.strip()
+
+
+def _extract_five_dim_from_markdown(markdown: str) -> str:
+    section = _section_between(
+        markdown,
+        r'^\s*##\s*(?:<text\b[^>]*>)?\s*五维分析\s*(?:</text>)?\s*$',
+        r'^\s*##\s*(?:<text\b[^>]*>)?\s*精华金句\s*(?:</text>)?\s*$',
+    )
+    if not section:
+        raise RuntimeError("解析 analysis.json 失败：未找到「五维分析」段")
+
+    labels = {
+        "一": "①",
+        "二": "②",
+        "三": "③",
+        "四": "④",
+        "五": "⑤",
+    }
+    parts = []
+    heading_re = re.compile(
+        r'^\s*###\s*(?:<text\b[^>]*>)?\s*([一二三四五])[、.，]\s*([^\n<]*?)(?:</text>)?\s*$',
+        re.MULTILINE,
+    )
+    matches = list(heading_re.finditer(section))
+    for idx, match in enumerate(matches):
+        body_start = match.end()
+        body_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(section)
+        title = _plain_markdown(match.group(2)).strip()
+        body = _plain_markdown(section[body_start:body_end])
+        parts.append(f"{labels[match.group(1)]} {title}\n{body}".strip())
+
+    if len(parts) < 5:
+        raise RuntimeError(f"解析 analysis.json 失败：五维分析只识别到 {len(parts)} 段，预期 5 段")
+    return "\n\n".join(parts[:5])
+
+
+def _extract_quotes_from_markdown(markdown: str) -> str:
+    section = _section_between(
+        markdown,
+        r'^\s*##\s*(?:<text\b[^>]*>)?\s*精华金句\s*(?:</text>)?\s*$',
+        r'^\s*##\s*(?:<text\b[^>]*>)?\s*中英对照逐字稿\s*(?:</text>)?\s*$',
+    )
+    if not section:
+        raise RuntimeError("解析 analysis.json 失败：未找到「精华金句」段")
+    section = _plain_markdown(section)
+    section = re.sub(r'\n{3,}', '\n\n', section)
+    return section.strip()
+
+
+def extract_analysis_from_wiki(record_id: str, doc_token: str = None) -> dict:
+    """从飞书 Wiki 页面反向解析 analysis.json。"""
+    if not doc_token:
+        config = load_config()
+        record = get_record(config, record_id)
+        wiki_url = record.get("飞书页面URL", "")
+        wiki_token = _extract_wiki_token(wiki_url)
+        if not wiki_token:
+            raise RuntimeError(f"收件表记录 {record_id} 缺少可解析的「飞书页面URL」")
+        node_payload = _run_lark_cli_required([
+            "lark-cli", "wiki", "spaces", "get_node",
+            "--params", json.dumps({"token": wiki_token, "obj_type": "wiki"}, ensure_ascii=False),
+        ], action=f"解析 Wiki 节点 {wiki_token}")
+        node = node_payload.get("data", {}).get("node", {})
+        doc_token = node.get("obj_token")
+        if not doc_token:
+            raise RuntimeError(f"解析 Wiki 节点 {wiki_token} 失败：响应中缺少 obj_token")
+
+    fetch_payload = _run_lark_cli_required([
+        "lark-cli", "docs", "+fetch",
+        "--doc", doc_token,
+    ], action=f"读取飞书文档 {doc_token}")
+    markdown = _extract_markdown_from_payload(fetch_payload)
+    return {
+        "five_dim": _extract_five_dim_from_markdown(markdown),
+        "quotes": _extract_quotes_from_markdown(markdown),
+        "annotations": {},
+    }
+
+
+def _main():
+    parser = argparse.ArgumentParser(description="All In Podcast 工具函数")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    extract_parser = subparsers.add_parser("extract-analysis", help="从飞书 Wiki 页面反向解析 analysis.json")
+    extract_parser.add_argument("--record-id", required=True)
+    extract_parser.add_argument("--doc-token", default=None)
+    extract_parser.add_argument("--out", default=None)
+
+    args = parser.parse_args()
+    if args.command == "extract-analysis":
+        out = Path(args.out or f"/tmp/allin_{args.record_id}_analysis.json")
+        try:
+            analysis = extract_analysis_from_wiki(args.record_id, args.doc_token)
+        except RuntimeError as exc:
+            print(f"❌ {exc}", file=sys.stderr)
+            sys.exit(1)
+        out.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ 已写出 analysis.json: {out}")
+
+
+if __name__ == '__main__':
+    _main()

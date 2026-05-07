@@ -109,6 +109,26 @@ def format_duration(duration) -> str:
     return text if text.endswith('分钟') else f"{text}分钟"
 
 
+def parse_pages_arg(arg) -> set[int] | None:
+    """解析 --pages：None/空值表示全部；否则只允许 1-5 的页码。"""
+    if arg is None:
+        return None
+    text = str(arg).strip()
+    if not text:
+        return None
+
+    pages = set()
+    for item in text.split(','):
+        item = item.strip()
+        if not item or not item.isdigit():
+            raise argparse.ArgumentTypeError('--pages 只接受 1-5 的数字，多个页码用英文逗号分隔')
+        page_num = int(item)
+        if page_num < 1 or page_num > 5:
+            raise argparse.ArgumentTypeError('--pages 页码范围只能是 1-5')
+        pages.add(page_num)
+    return pages
+
+
 def strip_feishu_tags(text: str) -> str:
     """剥离飞书富文本标签（<text color="...">...</text> / <callout .../> 等），
     保留内部纯文本。否则 short_phrase 会把标签字符当成普通字符处理，
@@ -577,10 +597,16 @@ def main():
     parser.add_argument('--output-dir', default='/tmp')
     parser.add_argument('--prompts-only', action='store_true',
                         help='只打印提示词，不调 API')
+    parser.add_argument('--pages', default=None,
+                        help='只生成指定页，1-based逗号分隔，如 1 或 1,4，不指定=全部5张')
     args = parser.parse_args()
 
     if not args.record_id and not args.record_json:
         parser.error('需要 --record-id 或 --record-json')
+    try:
+        selected = parse_pages_arg(args.pages)
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
 
     config = load_config()
 
@@ -616,6 +642,11 @@ def main():
         sys.exit(1)
 
     pages = build_page_prompts(record, analysis)
+    if selected:
+        pages = [p for p in pages if p['page_num'] in selected]
+        if not pages:
+            sys.exit(f"❌  --pages 未匹配任何页面: {args.pages}")
+        print(f"[过滤] 只生指定页: {', '.join(str(p['page_num']) for p in pages)}")
     print(f"[规划] 共 {len(pages)} 张：{', '.join(p['title'] for p in pages)}")
 
     if args.prompts_only:
