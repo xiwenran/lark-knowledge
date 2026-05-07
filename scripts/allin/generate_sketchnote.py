@@ -65,9 +65,10 @@ def extract_dim(text: str, marker: str) -> str:
     return m.group(1).strip() if m else ''
 
 
-def extract_bullets(text: str, max_points: int = 3) -> list:
+def extract_bullets(text: str, max_points: int = 3, max_len: int = 60) -> list:
     """从段落文本提取 2-4 个核心要点。
-    先剥离飞书富文本标签，避免 <text color="..."> 等标签被当作内容截入要点。"""
+    先剥离飞书富文本标签，避免 <text color="..."> 等标签被当作内容截入要点。
+    要点长度默认 60 字符（之前 32 字偏短，让内页像封面而不是内容页）。"""
     text = strip_feishu_tags(text)
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     sentences = []
@@ -75,8 +76,8 @@ def extract_bullets(text: str, max_points: int = 3) -> list:
         for part in re.split(r'[。；;]', line):
             part = part.strip()
             if len(part) > 6:
-                sentences.append(part[:32] + ('…' if len(part) > 32 else ''))
-    return sentences[:max_points] if sentences else ([text[:40] + '…'] if text else ['（待补充）'])
+                sentences.append(part[:max_len] + ('…' if len(part) > max_len else ''))
+    return sentences[:max_points] if sentences else ([text[:max_len + 8] + '…'] if text else ['（待补充）'])
 
 
 def parse_first_quote(quotes_text: str) -> dict:
@@ -137,12 +138,55 @@ def strip_feishu_tags(text: str) -> str:
     return text
 
 
-def short_phrase(text: str, fallback: str, max_len: int = 8) -> str:
+_TRAILING_PARTICLES = '的了着过吧呢么么呀啊嘛'  # 助词
+_TRAILING_PREPOSITIONS = '在对从向到给为让使被由以与和及或者而'  # 介词/连词
+
+
+def short_phrase(text: str, fallback: str, max_len: int = 14) -> str:
+    """提取标签短语。优先级：
+    1. METAPHOR_LIBRARY 预设词命中（如「算力入口」「债务炸弹」）
+    2. 英文名词或大写缩写（如 SpaceX / Cursor / SaaS / AWS）
+    3. 中文首句截断 + 虚词尾保护（避免「算力即入口的」「氯吡硫磷在国」这类切割）
+    """
     text = strip_feishu_tags(text)
     text = re.sub(r'^[①②③④⑤一二三四五六七八九十、：:\s]+', '', text).strip()
-    text = re.sub(r'[，。；;：:\n].*$', '', text).strip()
+
+    # 优先 1：METAPHOR_LIBRARY 全文命中
+    for key in poster_template.METAPHOR_LIBRARY:
+        if key in text:
+            return key
+
+    # 优先 2a：连续两个大写词组合（如 "App Store"、"Google Cloud"）
+    m = re.search(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]+\s+[A-Z][A-Za-z0-9]+)(?=[^A-Za-z]|$)', text)
+    if m:
+        return m.group(1)
+    # 优先 2b：单个大写词（缩写或名词），至少 4 字符（避开 App/End/Big 等常见短词）
+    # 注：不用 \b（Python 3 中文是 \w，"果" 与 "A" 之间无 word boundary，会跳过 App 误匹配 Store）
+    m = re.search(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]{3,15})(?=[^A-Za-z]|$)', text)
+    if m:
+        return m.group(1)
+
+    # 中文：取首句到第一个标点
+    text = re.sub(r'[，。；;：:、\n].*$', '', text).strip()
     text = re.sub(r'[^\w一-鿿&+·-]', '', text)
-    return (text[:max_len] or fallback)
+
+    if not text:
+        return fallback
+
+    if len(text) <= max_len:
+        # 整个短句都没超长，但仍要去虚词尾
+        truncated = text
+    else:
+        truncated = text[:max_len]
+
+    # 虚词尾保护：先去助词尾（如「的」），再去「介词+单字」尾（如「在国」「向人」）
+    while len(truncated) > 2 and truncated[-1] in _TRAILING_PARTICLES:
+        truncated = truncated[:-1]
+    truncated = re.sub(rf'[{_TRAILING_PREPOSITIONS}][^a-zA-Z]{{1,2}}$', '', truncated)
+    while len(truncated) > 2 and truncated[-1] in _TRAILING_PARTICLES:
+        truncated = truncated[:-1]
+
+    return truncated or fallback
 
 
 def pick_core_word(title: str, five_dim_raw: str = '') -> str:
@@ -240,7 +284,9 @@ def build_cover_params(record: dict, analysis: dict, palette: dict | None = None
 
 
 def extract_stance(text: str, name: str) -> str:
-    """三层匹配，逐层放宽，确保提取到真实内容而非「见正文」占位符。"""
+    """三层匹配，逐层放宽，确保提取到真实内容而非「见正文」占位符。
+    入口先剥离飞书富文本标签，避免 </text> 等标签残留到立场说明里。"""
+    text = strip_feishu_tags(text)
     m = re.search(rf'{name}[：:]\s*([^。\n]{{5,35}})', text)
     if m:
         return m.group(1).strip()
@@ -265,7 +311,7 @@ def build_points(text: str, fallbacks: list[str], icon_hint: str) -> list[dict]:
     for idx, fallback in enumerate(fallbacks):
         body = bullets[idx] if idx < len(bullets) else fallback
         points.append({
-            'label': short_phrase(body, fallback, 6),
+            'label': short_phrase(body, fallback, 14),
             'text': body,
             'icon_hint': icon_hint,
         })
