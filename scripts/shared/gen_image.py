@@ -1,103 +1,572 @@
 #!/usr/bin/env python3
 """
-gen_image.py — 通用图片生成 CLI 工具（仅 API 调用，不含业务逻辑）
+gen_image.py — 商品拆解笔记图片生成 CLI
 
-从 config.json 读取 image_api 配置，调用 OpenAI 兼容接口生成图片。
-供各 Skill 和脚本复用。
+默认生成 4 张小红书商品拆解图：
+  1 封面 + 3 内容图（商业模式拆解 / 流量拆解 / 机会拆解）。
 
-用法：
-  python3 gen_image.py --prompt "手绘风格..." --output /tmp/sketch.png
-  python3 gen_image.py --prompt "..." --output /tmp/sketch.png --size 1024x1536
+也保留单 prompt 生图兼容入口：
+  python3 scripts/shared/gen_image.py --prompt "..." --output /tmp/sketch.png
+
+商品拆解用法：
+  python3 scripts/shared/gen_image.py --record-id recXXX --prompts-only
+  python3 scripts/shared/gen_image.py --record-json /tmp/product_record.json --prompts-only
+  python3 scripts/shared/gen_image.py --record-id recXXX --output-dir /tmp
 """
 
+from __future__ import annotations
+
+import argparse
+import base64
+import concurrent.futures
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
-import base64
-import argparse
 import time
 import urllib.request
 from pathlib import Path
+from typing import Any
+
 from openai import OpenAI
 
-# 复用项目统一的配置路径（与 scripts/allin/utils.py 一致）
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "allin"))
-try:
-    from utils import load_config as _load_project_config
-except ImportError:
-    _load_project_config = None
-
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent
 CONFIG_PATH = Path.home() / ".agents/skills/lark-knowledge-config/config.json"
+DEFAULT_API_BASE = "https://api.vectorengine.cn/v1"
+DEFAULT_MODEL = "gpt-image-2"
+MIN_IMAGE_BYTES = 10 * 1024
+
+sys.path.insert(0, str(SCRIPT_DIR))
+from poster_template import (  # noqa: E402
+    METAPHOR_LIBRARY,
+    pick_palette,
+    render_cover_prompt,
+    render_inner_prompt,
+)
 
 
-def load_image_config() -> dict:
-    """从 config.json 读取 image_api 区块（优先走项目统一 load_config）"""
-    if _load_project_config:
-        cfg = _load_project_config()
-    else:
-        cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-    img = cfg.get('image_api', {})
+def load_config() -> dict[str, Any]:
+    """读取项目配置；本脚本只依赖 image_api 和 base 两个区块。"""
+    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def _normalize_field_value(value: Any) -> Any:
+    if isinstance(value, list) and len(value) == 1:
+        return _normalize_field_value(value[0])
+    if isinstance(value, dict):
+        for key in ("text", "name", "value", "link", "url"):
+            if key in value:
+                return value[key]
+    return value
+
+
+def normalize_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {key: _normalize_field_value(value) for key, value in record.items()}
+
+
+def get_record(config: dict[str, Any], record_id: str) -> dict[str, Any]:
+    """从通用知识库 Base 读取商品调研记录。"""
+    base_cfg = config.get("base", {})
+    base_token = base_cfg.get("base_token") or config.get("base_token")
+    table_id = base_cfg.get("table_id") or config.get("table_id")
+    if not base_token or not table_id:
+        raise SystemExit("error: config.json 缺少 base.base_token 或 base.table_id")
+
+    result = subprocess.run(
+        [
+            "lark-cli",
+            "base",
+            "+record-get",
+            "--base-token",
+            str(base_token),
+            "--table-id",
+            str(table_id),
+            "--record-id",
+            record_id,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"error: lark-cli 返回非 JSON: {result.stderr[:200]}") from exc
+    if not data.get("ok"):
+        msg = data.get("msg") or data.get("error") or result.stdout[:200]
+        raise SystemExit(f"error: 读取记录失败: {msg}")
+    return normalize_record(data["data"]["record"])
+
+
+def load_json(path: str | Path) -> dict[str, Any]:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_image_config() -> dict[str, str]:
+    """从 config.json 读取 image_api 区块。"""
+    cfg = load_config()
+    img = cfg.get("image_api", {})
     return {
-        'key': img.get('key') or os.environ.get('IMAGE_API_KEY', ''),
-        'base_url': img.get('base_url') or os.environ.get('IMAGE_API_BASE', ''),
-        'model': img.get('model') or 'gpt-image-2',
+        "key": img.get("key") or os.environ.get("IMAGE_API_KEY", ""),
+        "base_url": img.get("base_url") or os.environ.get("IMAGE_API_BASE", "") or DEFAULT_API_BASE,
+        "model": img.get("model") or DEFAULT_MODEL,
     }
 
 
-def generate(prompt: str, output: str, size: str = "1024x1536",
-             retry: int = 3) -> bool:
-    """调用图片 API，保存到 output 路径，返回是否成功"""
-    cfg = load_image_config()
-    if not cfg['key']:
-        print("error: 缺少图片 API Key（config.json image_api.key 或 IMAGE_API_KEY 环境变量）")
+def _first(record: dict[str, Any], *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = record.get(key)
+        if value is None:
+            continue
+        text = str(_normalize_field_value(value)).strip()
+        if text:
+            return text
+    return default
+
+
+def _truncate(text: str, limit: int = 42) -> str:
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    return text[:limit] + ("..." if len(text) > limit else "")
+
+
+def extract_dim(text: str, marker: str) -> str:
+    m = re.search(rf"{marker}[^\n]*\n(.*?)(?=①|②|③|④|⑤|\Z)", text, re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    m = re.search(rf"{marker}[^：:\n]*[：:]\s*(.+?)(?=\s*[①②③④⑤]|\Z)", text, re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+
+def extract_bullets(text: str, max_points: int = 3) -> list[str]:
+    text = str(text or "").strip()
+    if not text:
+        return []
+    candidates: list[str] = []
+    for line in text.splitlines():
+        line = re.sub(r"^[\-*·\d.、\s]+", "", line.strip())
+        if line:
+            candidates.append(line)
+    if len(candidates) < max_points:
+        for sentence in re.split(r"[。；;]", text):
+            sentence = sentence.strip()
+            if len(sentence) > 6:
+                candidates.append(sentence)
+    deduped = list(dict.fromkeys(_truncate(item, 34) for item in candidates if item))
+    return deduped[:max_points]
+
+
+def _format_points(points: list[str]) -> str:
+    while len(points) < 3:
+        points.append("待从正文补充具体数据与判断")
+    return "\n".join(f"- {point}" for point in points[:3])
+
+
+def _pick_product_palette() -> dict[str, Any]:
+    """商品拆解固定走亮色组，避免 K6 深色组自动命中。"""
+    return pick_palette({"forced_palette": "A"})
+
+
+def _palette_label(palette: dict[str, Any]) -> str:
+    return str(palette.get("name") or palette.get("description") or "A")
+
+
+def _lookup_metaphor(core_word: str, findings: list[dict[str, str]]) -> str:
+    if core_word in METAPHOR_LIBRARY:
+        return "\n".join(METAPHOR_LIBRARY[core_word])
+    findings.append(
+        {
+            "file": "scripts/shared/poster_template.py",
+            "line": "192",
+            "description": f"METAPHOR_LIBRARY 缺少商品拆解核心词「{core_word}」的隐喻预设，已用通用视觉母题降级。",
+            "owner": "K6/K5 后续补充隐喻预设",
+        }
+    )
+    return f"A. 围绕「{core_word}」设计一个清晰、轻盈、可读的水彩剪纸视觉母题"
+
+
+def _productize_prompt(prompt: str) -> str:
+    """把 K6 All In V2 模板渲染结果转换为商品拆解语境。"""
+    replacements = {
+        "正在创作 All In Podcast 中文知识库的封面海报": "正在创作小红书商品拆解笔记的封面海报",
+        "正在创作 All In Podcast 中文知识库的**内页**": "正在创作小红书商品拆解笔记的**内页**",
+        "在本期 All In Podcast 商品拆解 的语境中": "在这份商品拆解笔记的语境中",
+        "「ALL IN PODCAST 中文知识库」": "「商品拆解笔记」",
+        "- 四位主播名：Jason · Chamath · Sacks · Friedberg（小字嵌入侧边或底部，像署名一样克制）\n": "",
+        "底部右下角小字：「All In 中文笔记」（系列标识）": "底部右下角小字：「产品拆解笔记」（系列标识）",
+    }
+    for old, new in replacements.items():
+        prompt = prompt.replace(old, new)
+    return prompt
+
+
+def _analysis_text(analysis: dict[str, Any]) -> str:
+    for key in ("five_dim", "五维分析", "analysis", "markdown", "content"):
+        value = analysis.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def build_product_breakdown_prompts(
+    record: dict[str, Any], analysis: dict[str, Any] | None = None
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """构建商品拆解 4 张图的 V2 prompt。"""
+    record = normalize_record(record)
+    analysis = analysis or {}
+    findings: list[dict[str, str]] = []
+
+    product_name = _first(record, "商品名称", "产品名称", "标题", "title", "Title", default="未命名商品")
+    category = _first(record, "主营品类", "品类", "资产形态", "专题", default="商品品类")
+    traffic_entry = _first(record, "流量入口", "引流方式", "来源渠道", default="流量入口")
+    price = _first(record, "价格", "售价", "定价", default="价格待补充")
+    sales = _first(record, "销量", "销量数据", "已售", default="销量待补充")
+    date = _first(record, "调研日期", "发布日期", "创建时间", default=time.strftime("%Y-%m-%d"))
+
+    text = _analysis_text(analysis)
+    dim1 = extract_dim(text, "①")
+    dim2 = extract_dim(text, "②")
+    dim3 = extract_dim(text, "③")
+    dim5 = extract_dim(text, "⑤")
+
+    palette = _pick_product_palette()
+    palette_text = _palette_label(palette)
+
+    cover_core = product_name
+    business_core = f"{category}商业引擎"
+    traffic_core = f"{traffic_entry}流量漏斗"
+    opportunity_core = f"{category}机会地图"
+    cover_metaphors = _lookup_metaphor(cover_core, findings)
+    business_metaphors = _lookup_metaphor(business_core, findings)
+    traffic_metaphors = _lookup_metaphor(traffic_core, findings)
+    opportunity_metaphors = _lookup_metaphor(opportunity_core, findings)
+
+    cover_points = _format_points(
+        [
+            f"商品名称：{product_name}",
+            f"主营品类：{category}",
+            f"流量入口：{traffic_entry}",
+        ]
+    )
+    cover_prompt = _productize_prompt(
+        render_cover_prompt(
+            {
+                "episode": "商品拆解",
+                "date": date,
+                "core_word": cover_core,
+                "points": cover_points,
+                "palette": palette_text,
+                "aux_poetry": "- 「把一个商品拆成一张商业地图」\n- 「看见流量背后的结构」",
+                "forbidden": "- 不要出现推荐、种草、必买、安利等消费诱导措辞",
+                "context": f"这是一份小红书电商商品拆解，核心商品是「{product_name}」，主营品类是「{category}」，主要流量入口是「{traffic_entry}」。",
+                "core_word_symbolism": f"「{product_name}」象征一个可被拆解的商品样本；「{category}」象征赛道位置；「{traffic_entry}」象征增长入口。",
+                "metaphor_options": cover_metaphors,
+                "sub_words": "商业模式·流量转化·机会洞察",
+                "title": f"{product_name}：商品拆解笔记",
+                "duration": "产品形态·定价·转化",
+                "views": str(sales),
+                "topic": f"{category} · {traffic_entry}",
+            }
+        )
+    )
+
+    pages = [
+        {"page_num": 1, "title": "封面", "core_keyword": cover_core, "prompt": cover_prompt},
+        {
+            "page_num": 2,
+            "title": "商业模式拆解",
+            "core_keyword": business_core,
+            "prompt": _productize_prompt(
+                render_inner_prompt(
+                {
+                    "page_title": "商业模式拆解",
+                    "core_keyword": business_core,
+                    "page_subtitle": f"{product_name} 的产品形态、定价与赛道位置",
+                    "cross_page_motif_hint": (
+                        "视觉母题建议用商业引擎、齿轮组合、价格标签和交付盒子的剪纸结构。"
+                        f"\n隐喻预设参考：{business_metaphors}"
+                    ),
+                    "points": _format_points(
+                        extract_bullets(dim1 + "\n" + dim3, 3)
+                        or [f"产品形态：{category}", f"定价观察：{price}", "成本结构：从交付方式与内容密度推算"]
+                    ),
+                    "palette": palette_text,
+                    "aux_poetry": "一个商品，是一台被流量推动的商业引擎。",
+                }
+                )
+            ),
+        },
+        {
+            "page_num": 3,
+            "title": "流量拆解",
+            "core_keyword": traffic_core,
+            "prompt": _productize_prompt(
+                render_inner_prompt(
+                {
+                    "page_title": "流量拆解",
+                    "core_keyword": traffic_core,
+                    "page_subtitle": f"从「{traffic_entry}」看转化链路",
+                    "cross_page_motif_hint": (
+                        "视觉母题建议用漏斗、转化链路、手绘箭头和节点标记贯穿全页。"
+                        f"\n隐喻预设参考：{traffic_metaphors}"
+                    ),
+                    "points": _format_points(
+                        extract_bullets(dim2, 3)
+                        or [f"入口：{traffic_entry}", "路径：内容曝光 -> 私信/店铺 -> 下单", f"结果：{sales}"]
+                    ),
+                    "palette": palette_text,
+                    "aux_poetry": "流量不是水流，而是一串可复盘的转化节点。",
+                }
+                )
+            ),
+        },
+        {
+            "page_num": 4,
+            "title": "机会拆解",
+            "core_keyword": opportunity_core,
+            "prompt": _productize_prompt(
+                render_inner_prompt(
+                {
+                    "page_title": "机会拆解",
+                    "core_keyword": opportunity_core,
+                    "page_subtitle": f"围绕「{category}」寻找可迁移机会",
+                    "cross_page_motif_hint": (
+                        "视觉母题建议用地图标记、机会蓝图、路线箭头和风险边界线贯穿全页。"
+                        f"\n隐喻预设参考：{opportunity_metaphors}"
+                    ),
+                    "points": _format_points(
+                        extract_bullets(dim5, 3)
+                        or ["可借鉴：复制卖点结构而非照搬商品", f"切入点：围绕{category}做细分", "风险：同质化与平台规则变化"]
+                    ),
+                    "palette": palette_text,
+                    "aux_poetry": "机会不是答案，是地图上的下一枚标记。",
+                }
+                )
+            ),
+        },
+    ]
+    return pages, findings
+
+
+def generate_via_codex(prompt: str, output_path: Path, page_num: int = 0) -> bool:
+    """用 Codex 子代理生图。成功时图片已写到 output_path。"""
+    companion = shutil.which("codex-companion")
+    label = f"第 {page_num} 张" if page_num else "图片"
+    companion_cmd: list[str] | None = None
+    if companion:
+        print(f"codex-companion 路径：{companion}", file=sys.stderr)
+        companion_cmd = [companion]
+    else:
+        root = Path.home() / ".claude/plugins/cache/openai-codex"
+        candidates = sorted(
+            root.glob("*/scripts/codex-companion.mjs"),
+            key=lambda path: path.parent.parent.name,
+        )
+        if candidates:
+            mjs_path = candidates[-1]
+            print(f"codex-companion 路径：{mjs_path}", file=sys.stderr)
+            companion_cmd = ["node", str(mjs_path)]
+
+    if not companion_cmd:
+        print("codex-companion 未找到，fallback 到 API", file=sys.stderr)
         return False
 
-    client = OpenAI(api_key=cfg['key'], base_url=cfg['base_url'])
+    prompt_path = Path(f"/tmp/allin_img_prompt_{page_num or int(time.time())}.txt")
+    prompt_path.write_text(prompt, encoding="utf-8")
+    task = (
+        f"读取 {prompt_path} 的提示词，用 gpt-image-2 生成一张 1024x1536 竖版图片，"
+        f"将图片保存到 {output_path}。只完成生图和保存，不修改其他文件。"
+    )
+    try:
+        result = subprocess.run(
+            [*companion_cmd, "task", task],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except Exception as exc:
+        print(f"warn: {label} Codex 失败：{exc}")
+        return False
 
-    for attempt in range(retry):
+    if result.returncode != 0:
+        msg = (result.stderr or result.stdout or "").strip().splitlines()
+        print(f"warn: {label} Codex 失败：{msg[-1] if msg else 'unknown error'}")
+        return False
+    if output_path.exists() and output_path.stat().st_size > MIN_IMAGE_BYTES:
+        return True
+
+    print(f"warn: {label} Codex 未产出有效图片")
+    return False
+
+
+def generate_image(
+    prompt: str,
+    output_path: Path,
+    size: str = "1024x1536",
+    api_key: str | None = None,
+    api_base: str | None = None,
+    model: str | None = None,
+    retry: int = 3,
+    page_num: int = 0,
+) -> bool:
+    """Codex 优先，失败后调用图片 API，保存到 output_path。"""
+    failures = 0
+    prefer_api = os.environ.get("IMAGE_GEN_PREFER_API", "").lower() in {"1", "true", "yes", "on"}
+
+    if not prefer_api:
+        if generate_via_codex(prompt, output_path, page_num):
+            print(f"ok: {output_path} ({output_path.stat().st_size // 1024} KB)")
+            return True
+        failures += 1
+
+    cfg = load_image_config()
+    key = api_key or cfg["key"]
+    base_url = api_base or cfg["base_url"]
+    image_model = model or cfg["model"]
+    if not key:
+        print("error: Codex 失败且缺少图片 API Key（config.json image_api.key 或 IMAGE_API_KEY 环境变量）")
+        return False
+
+    client = OpenAI(api_key=key, base_url=base_url)
+
+    while failures < retry:
+        attempt = failures
         try:
-            resp = client.images.generate(
-                model=cfg['model'], prompt=prompt, n=1, size=size
-            )
-            items = resp.data if hasattr(resp, 'data') else resp.get('data', [])
+            resp = client.images.generate(model=image_model, prompt=prompt, n=1, size=size)
+            items = resp.data if hasattr(resp, "data") else resp.get("data", [])
             item = items[0]
 
-            b64 = getattr(item, 'b64_json', None) or (
-                item.get('b64_json') if isinstance(item, dict) else None)
-            url = getattr(item, 'url', None) or (
-                item.get('url') if isinstance(item, dict) else None)
+            b64 = getattr(item, "b64_json", None) or (
+                item.get("b64_json") if isinstance(item, dict) else None
+            )
+            url = getattr(item, "url", None) or (item.get("url") if isinstance(item, dict) else None)
 
             if b64:
                 img_bytes = base64.b64decode(b64)
             elif url:
-                with urllib.request.urlopen(url, timeout=60) as r:
-                    img_bytes = r.read()
+                with urllib.request.urlopen(url, timeout=60) as response:
+                    img_bytes = response.read()
             else:
-                raise ValueError(f"响应中无 b64_json 也无 url")
+                raise ValueError("响应中无 b64_json 也无 url")
 
-            Path(output).write_bytes(img_bytes)
-            print(f"ok: {output} ({len(img_bytes) // 1024} KB)")
+            output_path.write_bytes(img_bytes)
+            print(f"ok: {output_path} ({len(img_bytes) // 1024} KB)")
             return True
 
-        except Exception as e:
-            if attempt < retry - 1:
+        except Exception as exc:
+            failures += 1
+            if failures < retry:
                 wait = 30 * (attempt + 1)
-                print(f"retry: 第 {attempt+1} 次失败（{e}），{wait}s 后重试...")
+                print(f"retry: 第 {attempt + 1} 次失败（{exc}），{wait}s 后重试...")
                 time.sleep(wait)
             else:
-                print(f"error: 放弃（{e}）")
+                print(f"error: 放弃（{exc}）")
     return False
 
 
-def main():
-    p = argparse.ArgumentParser(description='调用图片 API 生成图片')
-    p.add_argument('--prompt', required=True, help='图片生成提示词')
-    p.add_argument('--output', required=True, help='输出文件路径')
-    p.add_argument('--size', default='1024x1536', help='图片尺寸（默认竖版 1024x1536）')
-    args = p.parse_args()
-    ok = generate(args.prompt, args.output, args.size)
-    sys.exit(0 if ok else 1)
+def generate(prompt: str, output: str, size: str = "1024x1536", retry: int = 3) -> bool:
+    """兼容入口：生成单张图片。"""
+    return generate_image(prompt, Path(output), size=size, retry=retry)
 
 
-if __name__ == '__main__':
+def _safe_filename(text: str) -> str:
+    text = re.sub(r'[\\/:*?"<>|\s]+', "_", text.strip())
+    return text.strip("_") or "image"
+
+
+def _print_prompts(pages: list[dict[str, Any]], findings: list[dict[str, str]]) -> None:
+    print("\n" + "=" * 60)
+    for page in pages:
+        print(f"\n-- 第 {page['page_num']} 张：{page['title']}（核心隐喻词：{page['core_keyword']}） --")
+        print(page["prompt"])
+    if findings:
+        print("\n-- 发现清单 --")
+        for item in findings:
+            print(f"{item['file']}:{item['line']} - {item['description']} - {item['owner']}")
+
+
+def _load_record_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    if args.record_json:
+        return normalize_record(load_json(args.record_json))
+    if args.record_id:
+        return get_record(load_config(), args.record_id)
+    raise SystemExit("error: 商品拆解模式需要 --record-id 或 --record-json")
+
+
+def _generate_one_page(page: dict[str, Any], output: Path, size: str) -> tuple[int, str, str | None, float]:
+    start = time.time()
+    ok = generate_image(page["prompt"], output, size=size, page_num=page["page_num"])
+    elapsed = time.time() - start
+    return page["page_num"], page["title"], str(output) if ok else None, elapsed
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="生成商品拆解笔记图片（V2 模板）")
+    parser.add_argument("--prompt", help="兼容模式：直接传单张图片提示词")
+    parser.add_argument("--output", help="兼容模式：单张图片输出路径")
+    parser.add_argument("--size", default="1024x1536", help="图片尺寸（默认竖版 1024x1536）")
+    parser.add_argument("--record-id", help="商品调研记录 record_id")
+    parser.add_argument("--record-json", help="离线商品调研记录 JSON")
+    parser.add_argument("--analysis", help="五维分析 JSON，可包含 five_dim/markdown/content 字段")
+    parser.add_argument("--output-dir", default="/tmp", help="批量生成输出目录")
+    parser.add_argument("--prompts-only", action="store_true", help="只打印 4 张提示词，不调 API")
+    parser.add_argument("--dry-run", action="store_true", help="等同 --prompts-only")
+    args = parser.parse_args()
+
+    if args.prompt or args.output:
+        if not args.prompt or not args.output:
+            raise SystemExit("error: --prompt 和 --output 必须同时提供")
+        ok = generate(args.prompt, args.output, args.size)
+        sys.exit(0 if ok else 1)
+
+    record = _load_record_from_args(args)
+    analysis = load_json(args.analysis) if args.analysis else {}
+    pages, findings = build_product_breakdown_prompts(record, analysis)
+
+    if args.prompts_only or args.dry_run:
+        _print_prompts(pages, findings)
+        return
+
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    product_name = _first(record, "商品名称", "产品名称", "标题", "title", default="product")
+
+    generated_by_page: dict[int, str] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {}
+        for page in pages:
+            output = output_dir / (
+                f"sketchnote_{_safe_filename(product_name)}_{page['page_num']:02d}_{page['title']}.png"
+            )
+            futures[executor.submit(_generate_one_page, page, output, args.size)] = page
+
+        completed = 0
+        for future in concurrent.futures.as_completed(futures):
+            page = futures[future]
+            completed += 1
+            try:
+                page_num, title, result, elapsed = future.result()
+            except Exception as exc:
+                page_num, title, result, elapsed = page["page_num"], page["title"], None, 0.0
+                print(f"error: 第 {page_num} 张异常（{exc}）")
+            print(f"[完成] {completed}/4 — {title} (耗时 {elapsed:.0f}s)")
+            if result:
+                generated_by_page[page_num] = result
+
+    generated = [generated_by_page[page["page_num"]] for page in pages if page["page_num"] in generated_by_page]
+
+    print(f"\n完成：{len(generated)}/4 张 -> {output_dir}")
+    for path in generated:
+        print(f"  {path}")
+    if findings:
+        print("\n发现清单：")
+        for item in findings:
+            print(f"- {item['file']}:{item['line']} - {item['description']} - {item['owner']}")
+    sys.exit(0 if len(generated) == len(pages) else 1)
+
+
+if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@
 generate_sketchnote.py — 生成 All In Podcast 手绘笔记图片
 
 从 analysis.json 提炼每张图的内容要点，调用图片生成 API 批量生成。
-风格：黑线 + 天蓝色 + 米白背景，Sketchnote 手绘速记风。
+风格：V2 手绘高级概念海报（cover_v2 + inner_v2 双模板）。
 
 用法：
   export IMAGE_API_KEY=sk-xxx
@@ -29,6 +29,8 @@ import sys
 import time
 import base64
 import argparse
+import concurrent.futures
+import shutil
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -39,20 +41,14 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 
 DEFAULT_API_BASE = "https://api.vectorengine.cn/v1"
 DEFAULT_MODEL = "gpt-image-2"
+MIN_IMAGE_BYTES = 10 * 1024
 
 # 引入共享工具
 import sys as _sys
+_sys.path.insert(0, str(REPO_ROOT))
 _sys.path.insert(0, str(SCRIPT_DIR))
+from scripts.shared import poster_template
 from utils import load_config, get_record
-
-# ── 风格基底（所有图共用）────────────────────────────────
-STYLE_BASE = (
-    "手绘 sketchnote 笔记风格。黑色线条为主，天蓝色（#4DABF7）作为高亮强调色，"
-    "米白色背景（#FAFAF7）。手写字体质感，有涂鸦式图标和指示箭头。"
-    "竖版 3:4 比例，内容居中，留白充足，最多 4 个主要视觉元素。"
-    "底部右下角标注小字：「All In 中文笔记」。不要出现任何英文界面元素，全部用中文。"
-    "【重要】不要在图片任何位置添加页码标识（如「第1页」「第3页」「Page 3」等），页码完全不需要出现。"
-)
 
 
 def extract_dim(text: str, marker: str) -> str:
@@ -96,146 +92,367 @@ def parse_first_quote(quotes_text: str) -> dict:
     return {'en': '', 'zh': '', 'speaker': ''}
 
 
-def build_page_prompts(record: dict, analysis: dict) -> list:
-    """根据方案文档第八节，生成每张图的提示词列表"""
-    episode  = record.get('期号', 'E???')
-    cn_title = record.get('中文标题', '未知标题')
-    date     = str(record.get('发布日期', ''))[:10]
-    duration = record.get('时长（分钟）', '?')
-    views    = record.get('YouTube播放量', 0)
-    views_wan = f"{int(views) // 10000}万" if views else '?万'
+def format_views(views) -> str:
+    """播放量转「万」格式，兼容数字和带逗号字符串。"""
+    try:
+        v = int(str(views).replace(',', '').replace('，', ''))
+    except (TypeError, ValueError):
+        return '?万'
+    return f"{v // 10000}万" if v >= 10000 else str(v)
 
+
+def format_duration(duration) -> str:
+    text = str(duration or '?').strip()
+    return text if text.endswith('分钟') else f"{text}分钟"
+
+
+def palette_label(palette: dict) -> str:
+    for key, value in poster_template.COLOR_PALETTES.items():
+        if value == palette:
+            return f"{key}（{value['name']}：{value['description']}）"
+    return str(palette.get('name') or palette)
+
+
+def pick_palette_for_record(record: dict) -> dict:
+    """把飞书中文字段补成 poster_template.pick_palette 可识别的别名。"""
+    normalized = dict(record)
+    normalized.setdefault('cn_title', record.get('中文标题', ''))
+    normalized.setdefault('topic', record.get('主题分类', ''))
+    normalized.setdefault('five_dim_score', record.get('五维综合评分', 0))
+    return poster_template.pick_palette(normalized)
+
+
+def short_phrase(text: str, fallback: str, max_len: int = 8) -> str:
+    text = re.sub(r'^[①②③④⑤一二三四五六七八九十、：:\s]+', '', str(text)).strip()
+    text = re.sub(r'[，。；;：:\n].*$', '', text).strip()
+    text = re.sub(r'[^\w一-鿿&+·-]', '', text)
+    return (text[:max_len] or fallback)
+
+
+def pick_core_word(title: str, five_dim_raw: str = '') -> str:
+    """从中文标题优先提取 2-4 字核心词，保持确定性。"""
+    if '：' in title or ':' in title:
+        tail = re.split(r'[：:]', title, maxsplit=1)[1]
+        m = re.search(r'[一-鿿]{2,4}', tail)
+        if m:
+            return m.group(0)
+
+    candidates = []
+    source = f"{title} {five_dim_raw}"
+    for key in poster_template.METAPHOR_LIBRARY:
+        if key in source:
+            candidates.append(key)
+    candidates.extend(re.findall(r'[一-鿿]{2,4}(?:入口|监管|主权|能源|芯片|关税|开源|算力|债务|云)', source))
+    return candidates[0] if candidates else short_phrase(title, '核心议题', 4)
+
+
+def pick_metaphor_key(text: str) -> str:
+    for key in poster_template.METAPHOR_LIBRARY:
+        if key in text:
+            return key
+    keyword_map = {
+        '监管': 'AI监管',
+        '数据': '数据主权',
+        '能源': '能源',
+        '芯片': '芯片',
+        '关税': '关税',
+        '开源': '开源',
+        '加密': '加密货币',
+        '货币': '加密货币',
+        '算力': '算力入口',
+    }
+    for keyword, key in keyword_map.items():
+        if keyword in text:
+            return key
+    return '算力入口'
+
+
+def format_metaphor_options(key: str) -> str:
+    options = poster_template.METAPHOR_LIBRARY.get(key, [])
+    return '\n'.join(options) if options else (
+        "A. 以核心词形成巨型水墨剪影\n"
+        "B. 用一个微小角色面对巨型结构，制造命运感\n"
+        "C. 让主题物件与产业场景交织成统一画面\n"
+        "D. 用留白和墨迹路径表达趋势方向"
+    )
+
+
+def build_cover_params(record: dict, analysis: dict, palette: dict | None = None) -> dict:
+    """提取 cover_v2 模板填空参数。"""
+    palette = palette or pick_palette_for_record(record)
     five_dim_raw = analysis.get('five_dim', '')
-    quotes_text  = analysis.get('quotes', '')
+    dim1 = extract_dim(five_dim_raw, '①')
+    dim2 = extract_dim(five_dim_raw, '②')
 
+    episode = record.get('期号', 'E???')
+    title = record.get('中文标题', '未知标题')
+    core_word = pick_core_word(title, five_dim_raw)
+    context_text = dim1 or dim2 or title
+    context = extract_bullets(context_text, 2)
+    point_candidates = extract_bullets(f"{dim1}。{dim2}", 3)
+    metaphor_key = pick_metaphor_key(f"{core_word} {title} {dim1} {dim2}")
+
+    sub_words = [short_phrase(point, fallback) for point, fallback in zip(
+        point_candidates,
+        ['核心议题', '论点链', '市场判断'],
+    )]
+    while len(sub_words) < 3:
+        sub_words.append(['核心议题', '论点链', '市场判断'][len(sub_words)])
+
+    return {
+        'episode': episode,
+        'date': str(record.get('发布日期', ''))[:10] or '未知日期',
+        'duration': format_duration(record.get('时长（分钟）', '?')),
+        'views': format_views(record.get('YouTube播放量', 0)),
+        'topic': record.get('主题分类', '未分类'),
+        'title': title,
+        'core_word': core_word,
+        'sub_words': '·'.join(sub_words[:3]),
+        'context': '\n'.join(f"- {item}" for item in context),
+        'points': '\n'.join(f"- {item}" for item in point_candidates),
+        'core_word_symbolism': (
+            f"「{core_word}」象征本期讨论中的关键入口与结构性力量。"
+            "请把它拆成可被看见的基础设施、关口、路径或秩序变化，"
+            "让观者无需读解释也能感到议题重量。"
+        ),
+        'metaphor_options': format_metaphor_options(metaphor_key),
+        'palette': palette_label(palette),
+        'aux_poetry': '\n'.join(f"- 「{item}」" for item in sub_words[:2]),
+        'forbidden': '',
+        'palette_dict': palette,
+    }
+
+
+def extract_stance(text: str, name: str) -> str:
+    """三层匹配，逐层放宽，确保提取到真实内容而非「见正文」占位符。"""
+    m = re.search(rf'{name}[：:]\s*([^。\n]{{5,35}})', text)
+    if m:
+        return m.group(1).strip()
+    m = re.search(
+        rf'{name}[^，。；\n]{{0,12}}(?:认为|表示|指出|则|强调|认定|判断)\s*([^。；\n]{{5,40}})',
+        text
+    )
+    if m:
+        return m.group(1).lstrip('，, ').strip()
+    for sent in re.split(r'[。；\n]', text):
+        if name in sent:
+            idx = sent.index(name)
+            chunk = sent[idx + len(name):].lstrip('则是而：: ，,').strip()
+            if len(chunk) >= 5:
+                return (chunk[:35] + '…') if len(chunk) > 35 else chunk
+    return ''
+
+
+def build_points(text: str, fallbacks: list[str], icon_hint: str) -> list[dict]:
+    bullets = extract_bullets(text, len(fallbacks))
+    points = []
+    for idx, fallback in enumerate(fallbacks):
+        body = bullets[idx] if idx < len(bullets) else fallback
+        points.append({
+            'label': short_phrase(body, fallback, 6),
+            'text': body,
+            'icon_hint': icon_hint,
+        })
+    return points
+
+
+def format_points(points: list[dict]) -> str:
+    return '\n'.join(
+        f"  要点{i + 1}「{p['label']}」：{p['text']}\n  视觉建议：{p['icon_hint']}"
+        for i, p in enumerate(points)
+    )
+
+
+def build_inner_params(record: dict, analysis: dict, page_index: int, palette: dict | None = None) -> dict:
+    """提取 inner_v2 模板填空参数。page_index: 0=核心议题, 1=市场判断, 2=四人立场, 3=国内启示。"""
+    palette = palette or pick_palette_for_record(record)
+    five_dim_raw = analysis.get('five_dim', '')
+    quotes_text = analysis.get('quotes', '')
     dim1 = extract_dim(five_dim_raw, '①')
     dim2 = extract_dim(five_dim_raw, '②')
     dim3 = extract_dim(five_dim_raw, '③')
     dim4 = extract_dim(five_dim_raw, '④')
     dim5 = extract_dim(five_dim_raw, '⑤')
+    title = record.get('中文标题', '未知标题')
 
-    # 从五维内容提取封面关键词
-    kw_raw = re.findall(r'[一-鿿]{2,6}(?:领域|趋势|模式|判断|机会|风险|债务|收购|估值|破产|监管|改革)', dim1 + dim2)
-    keywords = list(dict.fromkeys(kw_raw))[:3] or ['科技', 'AI', '投资']
+    page_specs = [
+        {
+            'page_title': '核心议题',
+            'source': f"{dim1}。{dim2}",
+            'subtitle': '议题背景与核心论点链',
+            'fallbacks': ['工具是入口', '论点链展开', '结构性变化'],
+            'motif': '让核心母题的不同侧面分别承载背景、论点和转折。',
+            'icon': '手绘入口 / 路径箭头 / 结构剖面',
+        },
+        {
+            'page_title': '市场判断',
+            'source': dim3,
+            'subtitle': '行业趋势、估值与风险信号',
+            'fallbacks': ['趋势信号', '估值变化', '风险边界'],
+            'motif': '让母题像钟摆或天秤一样贯穿三处判断，表现紧迫感和权衡。',
+            'icon': '手绘钟摆 / 天秤 / 数据刻度',
+        },
+        {
+            'page_title': '四人立场',
+            'source': dim4,
+            'subtitle': 'Jason · Chamath · Sacks · Friedberg 的分歧坐标',
+            'fallbacks': ['Jason 立场', 'Chamath 立场', 'Sacks 立场', 'Friedberg 立场'],
+            'motif': '让母题像四向罗盘或十字路口，四个方向分别承载四位主播。',
+            'icon': '手绘罗盘 / 路标 / 对话批注',
+        },
+        {
+            'page_title': '国内启示',
+            'source': dim5,
+            'subtitle': '可迁移到中国市场的判断',
+            'fallbacks': ['中国类比', '可迁移判断', '行动启示'],
+            'motif': '让母题像灯塔、种子或航线，三个要点沿光线或路径展开。',
+            'icon': '手绘灯塔 / 种子萌芽 / 航线图',
+        },
+    ]
+    spec = page_specs[page_index]
 
-    pages = []
-
-    # 第 1 页：封面（固定）
-    pages.append({
-        'page_num': 1, 'title': '封面',
-        'prompt': (
-            f"{STYLE_BASE}\n\n"
-            f"内容（封面页）：\n"
-            f"大标题（手写大字）：{cn_title}\n"
-            f"副标题小字：{episode} · {date} · {duration}分钟 · 播放量{views_wan}\n"
-            f"中央区域：四位主持人简笔画卡通头像，从左到右依次标注名字：Jason、Chamath、Sacks、Friedberg\n"
-            f"底部关键词标签（天蓝色气泡）：{'  ·  '.join(keywords)}\n"
-            f"整体构图：标题在上，人物在中，关键词在下，有手绘边框装饰"
-        )
-    })
-
-    # 第 2 页：核心议题（五维① + ②）
-    pts = extract_bullets(dim1 + '。' + dim2, 3)
-    bullet_str = '\n'.join(f'  · {p}' for p in pts)
-    pages.append({
-        'page_num': 2, 'title': '核心议题',
-        'prompt': (
-            f"{STYLE_BASE}\n\n"
-            f"内容（核心议题）：\n"
-            f"章节大标题（天蓝色手写）：本期核心议题\n"
-            f"要点（每条配手绘图标和箭头）：\n{bullet_str}\n"
-            f"版式：从上到下流程式排列，箭头连接，有涂鸦式分割线"
-        )
-    })
-
-    # 第 3 页：市场判断（五维③）—— 有内容才生成
-    if dim3:
-        pts3 = extract_bullets(dim3, 3)
-        bullet_str3 = '\n'.join(f'  · {p}' for p in pts3)
-        pages.append({
-            'page_num': 3, 'title': '市场判断',
-            'prompt': (
-                f"{STYLE_BASE}\n\n"
-                f"内容（市场判断）：\n"
-                f"章节大标题（天蓝色手写）：市场判断\n"
-                f"要点（每条配天蓝色数据高亮框）：\n{bullet_str3}\n"
-                f"版式：要点卡片式排列，重要数字用天蓝色方框圈出"
-            )
-        })
-
-    # 第 4 页：四人立场图谱（五维④）—— 有内容才生成
-    if dim4:
-        def _extract_stance(text: str, name: str) -> str:
-            """三层匹配，逐层放宽，确保提取到真实内容而非「见正文」占位符"""
-            # 层1：名字后紧跟冒号（最精确）
-            m = re.search(rf'{name}[：:]\s*([^。\n]{{5,35}})', text)
-            if m:
-                return m.group(1).strip()
-            # 层2：包含名字的句子里，提取名字后面的内容（认为/则/表示/指出等动词格式）
-            m = re.search(
-                rf'{name}[^，。；\n]{{0,12}}(?:认为|表示|指出|则|强调|认定|判断)\s*([^。；\n]{{5,40}})',
-                text
-            )
-            if m:
-                return m.group(1).lstrip('，, ').strip()
-            # 层3：提取含该名字的整句话，截取名字之后的内容
-            for sent in re.split(r'[。；\n]', text):
-                if name in sent:
-                    idx = sent.index(name)
-                    chunk = sent[idx + len(name):].lstrip('则是而：: ，,').strip()
-                    if len(chunk) >= 5:
-                        return (chunk[:35] + '…') if len(chunk) > 35 else chunk
-            return ''
-
-        stances = {name: _extract_stance(dim4, name)
-                   for name in ['Chamath', 'Jason', 'Sacks', 'Friedberg']}
-        # 如果某人立场完全提取不到，用 dim4 首句兜底（至少有内容可读）
-        fallback = extract_bullets(dim4, 1)[0] if dim4 else '（分析见正文）'
-        stance_lines = '\n'.join(
-            f"  · {name} 气泡：{stances[name] or fallback}"
+    if page_index == 2 and dim4:
+        fallback = extract_bullets(dim4, 1)[0]
+        stances = {
+            name: extract_stance(dim4, name) or fallback
             for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
-        )
-        pages.append({
-            'page_num': len(pages) + 1, 'title': '四人立场',
-            'prompt': (
-                f"{STYLE_BASE}\n\n"
-                f"内容（四人立场图谱）：\n"
-                f"章节大标题（天蓝色手写）：四人怎么看\n"
-                f"四个对话气泡，各写一位主播的核心观点：\n"
-                f"{stance_lines}\n"
-                f"版式：四个气泡分布在画面四角，中间是话题词，像对话现场"
-            )
-        })
+        }
+        points = [
+            {
+                'label': 'Jason/Chamath',
+                'text': f"Jason：{stances['Jason']}；Chamath：{stances['Chamath']}",
+                'icon_hint': spec['icon'],
+            },
+            {'label': 'Sacks', 'text': stances['Sacks'], 'icon_hint': spec['icon']},
+            {'label': 'Friedberg', 'text': stances['Friedberg'], 'icon_hint': spec['icon']},
+        ]
+    else:
+        points = build_points(spec['source'], spec['fallbacks'], spec['icon'])
 
-    # 最后页：国内启示 + 金句（固定）
-    pts5 = extract_bullets(dim5, 4)
-    bullet_str5 = '\n'.join(f'  · {p}' for p in pts5)
+    metaphor_key = pick_metaphor_key(f"{title} {spec['source']}")
+    metaphor_options = poster_template.METAPHOR_LIBRARY.get(metaphor_key, [])
+    metaphor_hint = metaphor_options[page_index % len(metaphor_options)] if metaphor_options else ''
     quote = parse_first_quote(quotes_text)
-    quote_line = f"底部金句（手写斜体，天蓝色）：「{quote['zh']}」 — {quote['speaker']}" if quote.get('zh') else ''
+    aux_poetry = quote['zh'] if page_index == 3 and quote.get('zh') else short_phrase(spec['source'], spec['page_title'], 10)
 
-    pages.append({
-        'page_num': len(pages) + 1, 'title': '国内启示',
-        'prompt': (
-            f"{STYLE_BASE}\n\n"
-            f"内容（国内启示）：\n"
-            f"章节大标题（天蓝色手写）：对我们的启示\n"
-            f"可迁移判断（每条配灯泡或箭头图标）：\n{bullet_str5}\n"
-            f"{quote_line}\n"
-            f"系列标识（底部居中小字）：All In 中文知识库\n"
-            f"版式：要点从上到下，金句在最底，有装饰性手绘边框"
-        )
-    })
+    return {
+        'page_title': spec['page_title'],
+        'core_keyword': metaphor_key if page_index == 0 else ['钟摆', '罗盘', '灯塔'][page_index - 1],
+        'page_subtitle': spec['subtitle'],
+        'points': points,
+        'cross_page_motif_hint': f"{spec['motif']} 隐喻方向参考「{metaphor_key}」：{metaphor_hint}",
+        'palette': palette_label(palette),
+        'aux_poetry': f"「{aux_poetry}」",
+        'palette_dict': palette,
+    }
+
+
+def render_inner_from_params(params: dict) -> str:
+    render_params = dict(params)
+    render_params['points'] = format_points(params['points'])
+    render_params.pop('palette_dict', None)
+    return poster_template.render_inner_prompt(render_params)
+
+
+def build_page_prompts(record: dict, analysis: dict) -> list:
+    """生成 1 张 cover_v2 + 4 张 inner_v2 的 V2 海报提示词。"""
+    palette = pick_palette_for_record(record)
+    cover_params = build_cover_params(record, analysis, palette)
+    cover_render_params = dict(cover_params)
+    cover_render_params.pop('palette_dict', None)
+
+    pages = [{
+        'page_num': 1,
+        'title': '封面',
+        'prompt': poster_template.render_cover_prompt(cover_render_params),
+    }]
+
+    for page_index, title in enumerate(['核心议题', '市场判断', '四人立场', '国内启示']):
+        params = build_inner_params(record, analysis, page_index, palette)
+        pages.append({
+            'page_num': page_index + 2,
+            'title': title,
+            'prompt': render_inner_from_params(params),
+        })
 
     return pages
 
 
-def generate_image(client: OpenAI, prompt: str, page_num: int,
+def find_codex_companion() -> list[str] | None:
+    """Return command prefix for codex-companion, including .mjs fallback."""
+    companion = shutil.which('codex-companion')
+    if companion:
+        print(f"codex-companion 路径：{companion}", file=sys.stderr)
+        return [companion]
+
+    root = Path.home() / '.claude/plugins/cache/openai-codex'
+    candidates = sorted(root.glob('*/scripts/codex-companion.mjs'), key=lambda path: path.parent.parent.name)
+    if candidates:
+        mjs_path = candidates[-1]
+        print(f"codex-companion 路径：{mjs_path}", file=sys.stderr)
+        return ['node', str(mjs_path)]
+
+    print("codex-companion 未找到，fallback 到 API", file=sys.stderr)
+    return None
+
+
+def generate_via_codex(prompt: str, page_num: int, output_path: Path) -> bool:
+    """用 Codex 子代理生图。成功时图片已写到 output_path。"""
+    companion_cmd = find_codex_companion()
+    if not companion_cmd:
+        return False
+
+    prompt_path = Path(f"/tmp/allin_img_prompt_{page_num}.txt")
+    prompt_path.write_text(prompt, encoding='utf-8')
+    task = (
+        f"读取 {prompt_path} 的提示词，用 gpt-image-2 生成一张 1024x1536 竖版图片，"
+        f"将图片保存到 {output_path}。只完成生图和保存，不修改其他文件。"
+    )
+    try:
+        result = subprocess.run(
+            [*companion_cmd, 'task', task],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except Exception as exc:
+        print(f"  ⚠️  第 {page_num} 张 Codex 失败：{exc}")
+        return False
+
+    if result.returncode != 0:
+        msg = (result.stderr or result.stdout or '').strip().splitlines()
+        print(f"  ⚠️  第 {page_num} 张 Codex 失败：{msg[-1] if msg else 'unknown error'}")
+        return False
+    if output_path.exists() and output_path.stat().st_size > MIN_IMAGE_BYTES:
+        return True
+
+    print(f"  ⚠️  第 {page_num} 张 Codex 未产出有效图片")
+    return False
+
+
+def generate_image(prompt: str, page_num: int, output_path: Path,
+                   api_key: str = None, api_base: str = None,
                    model: str = DEFAULT_MODEL, retry: int = 3) -> bytes | None:
-    """调用图片 API，返回图片字节。
+    """Codex 优先，失败后调用图片 API，返回图片字节。
     注意：不传 response_format 参数，兼容 VectorEngine 等中转站。
     默认返回 URL，自动下载；若有 b64_json 则直接解码。
     """
-    for attempt in range(retry):
+    failures = 0
+    prefer_api = os.environ.get('IMAGE_GEN_PREFER_API', '').lower() in {'1', 'true', 'yes', 'on'}
+
+    if not prefer_api:
+        if generate_via_codex(prompt, page_num, output_path):
+            return output_path.read_bytes()
+        failures += 1
+
+    if not api_key:
+        print(f"  ❌  第 {page_num} 张放弃：Codex 失败且未配置 API Key")
+        return None
+
+    client = OpenAI(api_key=api_key, base_url=api_base or DEFAULT_API_BASE)
+    while failures < retry:
+        attempt = failures
         try:
             response = client.images.generate(
                 model=model,
@@ -264,8 +481,9 @@ def generate_image(client: OpenAI, prompt: str, page_num: int,
             else:
                 raise ValueError(f"响应中无 b64_json 也无 url: {item}")
         except Exception as e:
+            failures += 1
             wait = 60 if attempt == 0 else 90
-            if attempt < retry - 1:
+            if failures < retry:
                 print(f"  ⚠️  第 {page_num} 张失败（{e}），{wait}s 后重试...")
                 time.sleep(wait)
             else:
@@ -273,9 +491,25 @@ def generate_image(client: OpenAI, prompt: str, page_num: int,
     return None
 
 
+def generate_one_page(page: dict, total: int, output_dir: Path, slug: str,
+                      api_key: str, api_base: str, model: str) -> tuple[int, str, str | None, float]:
+    start = time.time()
+    out = output_dir / f"allin_{slug}_sketch_{page['page_num']:02d}_{page['title']}.png"
+    img = generate_image(page['prompt'], page['page_num'], out, api_key, api_base, model)
+    elapsed = time.time() - start
+    if img:
+        if not out.exists() or out.read_bytes() != img:
+            out.write_bytes(img)
+        print(f"       ✅ {out.name} ({out.stat().st_size // 1024} KB)")
+        return page['page_num'], page['title'], str(out), elapsed
+    return page['page_num'], page['title'], None, elapsed
+
+
 def main():
     parser = argparse.ArgumentParser(description='生成 All In Podcast 手绘笔记')
-    parser.add_argument('--record-id', required=True)
+    parser.add_argument('--record-id', default=None)
+    parser.add_argument('--record-json', default=None,
+                        help='离线记录 JSON；传入后跳过 lark-cli 读取')
     parser.add_argument('--analysis', default=None)
     parser.add_argument('--api-key', default=None,
                         help='也可用 IMAGE_API_KEY 环境变量')
@@ -288,6 +522,9 @@ def main():
                         help='只打印提示词，不调 API')
     args = parser.parse_args()
 
+    if not args.record_id and not args.record_json:
+        parser.error('需要 --record-id 或 --record-json')
+
     config = load_config()
 
     # 优先级：命令行参数 > 环境变量 > config.json image_api 区块
@@ -296,19 +533,18 @@ def main():
     api_base = args.api_base or os.environ.get('IMAGE_API_BASE') or img_cfg.get('base_url', '') or DEFAULT_API_BASE
     model    = args.model    or img_cfg.get('model', '')          or DEFAULT_MODEL
 
-    if not args.prompts_only and not api_key:
-        print("❌ 缺少图片 API Key，支持三种方式配置：")
-        print("   1. export IMAGE_API_KEY=your_key")
-        print("   2. --api-key your_key")
-        print("   3. config.json 中加 \"image_api\": {\"key\": \"your_key\", \"base_url\": \"...\", \"model\": \"...\"}")
-        sys.exit(1)
-    print(f"[飞书] 读取收件表记录 {args.record_id}...")
-    record  = get_record(config, args.record_id)
-    episode = record.get('期号', 'E???')
+    if args.record_json:
+        print(f"[离线] 加载记录 JSON {args.record_json}...")
+        record = json.loads(Path(args.record_json).read_text(encoding='utf-8'))
+    else:
+        print(f"[飞书] 读取收件表记录 {args.record_id}...")
+        record = get_record(config, args.record_id)
+    episode = record.get('期号') or args.record_id or Path(args.record_json).stem
     print(f"       {episode} · {record.get('中文标题','')}")
 
     analysis = {}
-    ap = args.analysis or f"/tmp/allin_{args.record_id}_analysis.json"
+    analysis_key = args.record_id or Path(args.record_json).stem
+    ap = args.analysis or f"/tmp/allin_{analysis_key}_analysis.json"
     if Path(ap).exists():
         analysis = json.loads(Path(ap).read_text(encoding='utf-8'))
         print(f"[分析] 加载: {ap}")
@@ -331,22 +567,38 @@ def main():
             print(f"\n── 第 {p['page_num']} 张：{p['title']} ──\n{p['prompt']}")
         return
 
-    client = OpenAI(api_key=api_key, base_url=api_base)
-    print(f"[API]  {api_base}  model={model}")
+    prefer_api = os.environ.get('IMAGE_GEN_PREFER_API', '').lower() in {'1', 'true', 'yes', 'on'}
+    print(f"[生图] Codex优先={'否' if prefer_api else '是'}  API={api_base}  model={model}")
+    if not api_key:
+        print("[生图] 未配置 API Key；Codex 失败时无法 fallback 到 API")
 
     output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
     slug = episode.replace(' ', '_')
-    generated = []
+    generated_by_page = {}
 
-    for p in pages:
-        print(f"\n[生成] {p['page_num']}/{len(pages)} — {p['title']}...")
-        img = generate_image(client, p['prompt'], p['page_num'], model)
-        if img:
-            out = output_dir / f"allin_{slug}_sketch_{p['page_num']:02d}_{p['title']}.png"
-            out.write_bytes(img)
-            print(f"       ✅ {out.name} ({len(img)//1024} KB)")
-            generated.append(str(out))
-        time.sleep(1)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(generate_one_page, p, len(pages), output_dir, slug, api_key, api_base, model): p
+            for p in pages
+        }
+        completed = 0
+        for future in concurrent.futures.as_completed(futures):
+            page = futures[future]
+            completed += 1
+            try:
+                page_num, title, result, elapsed = future.result()
+            except Exception as exc:
+                page_num, title, result, elapsed = page['page_num'], page['title'], None, 0.0
+                print(f"  ❌  第 {page_num} 张异常: {exc}")
+            print(f"[完成] {completed}/{len(pages)} — {title} (耗时 {elapsed:.0f}s)")
+            if not result:
+                print(f"       ❌ 第 {page_num} 张失败")
+                result = None
+            if result:
+                generated_by_page[page_num] = result
+
+    generated = [generated_by_page[p['page_num']] for p in pages if p['page_num'] in generated_by_page]
 
     print(f"\n✅ 完成！{len(generated)}/{len(pages)} 张 → {output_dir}")
     for f in generated:

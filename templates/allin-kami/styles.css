@@ -55,10 +55,10 @@ html {
 
 body {
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--dark-warm);
-  line-height: 1.55;
+  line-height: 1.65;
   max-width: var(--page-width);
   margin: 0 auto;
   padding: 0;
@@ -70,7 +70,7 @@ body {
 /* ── @page 打印规则（抑制 Chrome 自动页眉页脚）── */
 @page {
   size: A4;
-  margin: 14mm 16mm;
+  margin: 10mm 12mm;
   background: var(--parchment);
 }
 
@@ -107,7 +107,7 @@ body {
   flex-direction: column;
   justify-content: center;
   min-height: 100vh;
-  padding: 80px 64px;
+  padding: 60px 28px;
   background: var(--parchment);
   border-top: 5px solid var(--brand);
   position: relative;
@@ -129,7 +129,7 @@ body {
 }
 
 .cover-title {
-  font-size: 42px;
+  font-size: 38px;
   font-weight: 500;
   color: var(--near-black);
   line-height: 1.25;
@@ -154,7 +154,7 @@ body {
    内容区通用
 ═══════════════════════════════════════ */
 .content {
-  padding: 48px 64px;
+  padding: 32px 20px;
   background: var(--parchment);
 }
 
@@ -195,7 +195,7 @@ body {
   border-radius: 3px;
   padding: 16px 20px;
   margin: 20px 0;
-  font-size: 13.5px;
+  font-size: 16.5px;
   line-height: 1.75;
   color: var(--dark-warm);
 }
@@ -210,7 +210,7 @@ body {
    五维分析
 ═══════════════════════════════════════ */
 .analysis-heading {
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 500;
   color: var(--near-black);
   margin: 32px 0 14px;
@@ -220,7 +220,7 @@ body {
 }
 
 .analysis-sub {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--brand);
   margin: 22px 0 8px;
@@ -250,7 +250,7 @@ body {
 }
 
 .quote-en {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--olive);
   font-style: italic;
   line-height: 1.6;
@@ -258,7 +258,7 @@ body {
 }
 
 .quote-zh {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--dark-warm);
   line-height: 1.6;
 }
@@ -275,7 +275,7 @@ body {
 ═══════════════════════════════════════ */
 /* ── 章节标题（时间段 + 主题）── */
 .chapter-heading {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--brand);
   margin: 36px 0 14px;
@@ -287,9 +287,9 @@ body {
 /* ── 英文原文（主体，上方）── */
 .en-para {
   margin-bottom: 4px;
-  line-height: 1.75;
+  line-height: 1.65;
   color: var(--dark-warm);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .en-para .speaker {
@@ -300,10 +300,10 @@ body {
 /* ── 中文翻译（次要，下方，与英文左对齐）── */
 .zh-translation {
   display: block;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--olive);
-  line-height: 1.7;
-  margin: 0 0 16px 0;
+  line-height: 1.65;
+  margin: 0 0 14px 0;
   padding: 0;
   border-left: none;
   background: transparent;
@@ -324,7 +324,7 @@ body {
 /* ── 英文原文旧样式（兼容）── */
 .en-text {
   display: block;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--stone);
   line-height: 1.6;
   margin: 4px 0 12px 0;
@@ -341,7 +341,7 @@ body {
   border-radius: 3px;
   padding: 10px 14px;
   margin: 10px 0 16px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--olive);
   line-height: 1.7;
 }
@@ -366,7 +366,7 @@ span[style*="color:#868e96"]  { color: var(--stone)       !important; }
   align-items: center;
   min-height: 50vh;
   text-align: center;
-  padding: 60px 64px;
+  padding: 48px 28px;
   border-top: 2px solid var(--border-soft);
   margin-top: 40px;
   background: var(--parchment);
@@ -405,7 +405,7 @@ span[style*="color:#868e96"]  { color: var(--stone)       !important; }
   display: flex;
   gap: 12px;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -435,7 +435,7 @@ span[style*="color:#868e96"]  { color: var(--stone)       !important; }
    说话人标签（逐字稿用，独立成行+颜色）
 ═══════════════════════════════════════ */
 .speaker-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   margin: 18px 0 3px 0;
   letter-spacing: 0.2px;

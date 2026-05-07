@@ -294,7 +294,9 @@ python3 ~/lark-knowledge/scripts/allin/generate_pdf.py \
 
 ---
 
-### 🤖 Step 10：生成手绘笔记（Codex 优先 → API fallback）
+### 🤖 Step 10：生成手绘笔记（V2 模板，Codex 优先 → API fallback）
+
+使用 V2 模板（`scripts/shared/poster_template.py` 的 `cover_v2` + `inner_v2` 双模板），生成 5 张图：1 张封面 + 4 张内页。提示词由 `poster_template` 统一渲染，配色使用同一组 V2 色彩体系，保证整期视觉一致。
 
 **优先方式：派 Codex 生成**
 
@@ -325,12 +327,12 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
 
 输出：`/tmp/allin_<期号>_sketch_01_封面.png` … `_sketch_0N_国内启示.png`
 
-固定结构（来自方案文档第八节）：
-- **第 1 张（封面）**：标题 + 四位主播简笔画 + 关键词气泡
-- **第 2 张（核心议题）**：五维①②提炼的 3 个要点
-- **第 3 张（市场判断）**：五维③，数据高亮框
-- **第 4 张（四人立场）**：四个对话气泡
-- **最后 1 张（国内启示）**：五维⑤ + 精华金句 + 账号水印
+固定结构（V2 手绘高级概念海报）：
+- **第 1 张（封面）**：`cover_v2`，巨型核心词 + 视觉隐喻 + 嵌入式封面信息
+- **第 2 张（核心议题）**：`inner_v2`，五维①②提炼的要点
+- **第 3 张（市场判断）**：`inner_v2`，五维③的行业判断
+- **第 4 张（四人立场）**：`inner_v2`，四位主播立场图谱
+- **第 5 张（国内启示）**：`inner_v2`，五维⑤ + 精华金句
 
 ---
 
