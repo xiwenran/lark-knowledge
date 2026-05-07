@@ -91,11 +91,29 @@ body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     max-width: 100%;
+    /* 寡行/孤行控制：避免某段尾巴一句孤悬到下一页 */
+    orphans: 3;
+    widows: 3;
   }
   .page-break  { page-break-after: always; break-after: page; }
   .no-break    { page-break-inside: avoid; break-inside: avoid; }
   .quote-block { page-break-inside: avoid; break-inside: avoid; }
   h2, h3       { page-break-after: avoid; break-after: avoid; }
+  /* 章节标题不孤立在页底（用户反馈：大段空白宁可留在前面，不要让标题被切到下页底部）*/
+  .analysis-heading,
+  .analysis-sub,
+  .chapter-heading {
+    page-break-after: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* 英中对照段视为整体，不切开（避免英文在上页、中文翻译在下页） */
+  .en-para,
+  .zh-translation {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   .page-header { display: none; }   /* 隐藏内嵌页眉，避免重复 */
 }
 
