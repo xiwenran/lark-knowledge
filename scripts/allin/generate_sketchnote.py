@@ -391,19 +391,17 @@ def build_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
     spec = page_specs[page_index]
 
     if page_index == 2 and dim4:
+        # 四人立场页必须 4 个 points（每个主播一块），不能合并 Jason+Chamath。
+        # 旧版合并成 3 个 points 时，AI 看到"四人立场"+4 主播名字会自己画 4 块，
+        # 没第 4 个 point 就复制 Sacks，导致 Sacks 在画面里重复出现。
         fallback = extract_bullets(dim4, 1)[0]
         stances = {
             name: extract_stance(dim4, name) or fallback
             for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
         }
         points = [
-            {
-                'label': 'Jason/Chamath',
-                'text': f"Jason：{stances['Jason']}；Chamath：{stances['Chamath']}",
-                'icon_hint': spec['icon'],
-            },
-            {'label': 'Sacks', 'text': stances['Sacks'], 'icon_hint': spec['icon']},
-            {'label': 'Friedberg', 'text': stances['Friedberg'], 'icon_hint': spec['icon']},
+            {'label': name, 'text': stances[name], 'icon_hint': spec['icon']}
+            for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
         ]
     else:
         points = build_points(spec['source'], spec['fallbacks'], spec['icon'])
