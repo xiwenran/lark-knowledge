@@ -66,7 +66,9 @@ def extract_dim(text: str, marker: str) -> str:
 
 
 def extract_bullets(text: str, max_points: int = 3) -> list:
-    """从段落文本提取 2-4 个核心要点"""
+    """从段落文本提取 2-4 个核心要点。
+    先剥离飞书富文本标签，避免 <text color="..."> 等标签被当作内容截入要点。"""
+    text = strip_feishu_tags(text)
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     sentences = []
     for line in lines:
@@ -122,8 +124,22 @@ def pick_palette_for_record(record: dict) -> dict:
     return poster_template.pick_palette(normalized)
 
 
+def strip_feishu_tags(text: str) -> str:
+    """剥离飞书富文本标签（<text color="...">...</text> / <callout .../> 等），
+    保留内部纯文本。否则 short_phrase 会把标签字符当成普通字符处理，
+    导致「textcolorblueSpaceX」这类前缀污染。"""
+    text = str(text)
+    # 先把 <text color="...">...</text> 内部内容保留，标签去掉
+    text = re.sub(r'<text\b[^>]*>', '', text)
+    text = re.sub(r'</text>', '', text)
+    # 其它飞书富文本标签（callout / view / file / image / grid / column）一并剥
+    text = re.sub(r'</?(?:callout|view|file|image|grid|column)\b[^>]*/?>', '', text)
+    return text
+
+
 def short_phrase(text: str, fallback: str, max_len: int = 8) -> str:
-    text = re.sub(r'^[①②③④⑤一二三四五六七八九十、：:\s]+', '', str(text)).strip()
+    text = strip_feishu_tags(text)
+    text = re.sub(r'^[①②③④⑤一二三四五六七八九十、：:\s]+', '', text).strip()
     text = re.sub(r'[，。；;：:\n].*$', '', text).strip()
     text = re.sub(r'[^\w一-鿿&+·-]', '', text)
     return (text[:max_len] or fallback)
