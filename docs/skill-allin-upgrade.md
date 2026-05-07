@@ -657,103 +657,50 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 
 ---
 
-### 5.5b 字色宪法（跨模板共用，自动注入）
+### 5.5b 字色/配色宪法（V3 纯原则版）
 
-**位置**：`scripts/shared/poster_template.py` 顶部，`COLOR_PALETTES` 之前
+**位置**：`scripts/shared/poster_template.py`
 
-**为什么单独立成宪法**：用户实测发现「朱红字 + 米黄宣纸底」在 iPhone 上对比度不够、看不清。如果只在 INNER_V2_TEMPLATE 里写一段字色规则，COVER_V2_TEMPLATE 和未来新模板（如商品拆解卡片、社交分享图）都不会自动生效——破坏跨会话稳定性。
+V3 从「硬编码 ink / 4 组预设色板」升级为「对比度语义 + 情绪库 + AI 判断」。模板不再要求主流程选择 A/B/C/D，也不再通过 `pick_palette()` 强制套色；主流程只负责把内容语境交给模板，色彩由 prompt 内的原则约束和情绪映射库指导 AI 判断。
 
-**实现**：
+**5 条原则概述**：
 
-```python
-TEXT_COLOR_RULES = """━━━━━ 文字可读性宪法（所有模板必须遵守）━━━━━
-**主规则：可读文字一律用深色，朱红/暖金只做装饰**
-... 详见 poster_template.py
-"""
-```
+1. 配色情绪映射：危机、算力、增长、医疗、能源、博弈等情绪分支给出软指导，AI 可按文化背景微调。
+2. 配色克制：每张图最多 1 个主色、1-2 个强调色、1 个装饰色、1 个中性背景，合计不超过 4 色。
+3. 字色对比度：所有可读文字与背景对比度必须 ≥ 4.5:1，按 WCAG AA 作为手机阅读基准。
+4. 印章式标签：深色字 + 鲜色底，禁用鲜色字 + 浅色底。
+5. 同期一致性：同一期 4 张内页 + 1 张封面共用同一组配色，不能每页换调色板。
 
-**自动注入**：
+**跨模板统一注入契约**：
 
-```python
-def render_cover_prompt(params: dict) -> str:
-    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
-    return COVER_V2_TEMPLATE.format(**merged)
-
-def render_inner_prompt(params: dict) -> str:
-    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
-    return INNER_V2_TEMPLATE.format(**merged)
-```
-
-`COVER_V2_TEMPLATE` 和 `INNER_V2_TEMPLATE` 都含 `{text_color_rules}` 占位符；render 函数自动把 TEXT_COLOR_RULES 合并到参数字典中。
-
-**对未来新模板的要求**（重要）：
-
-任何新加的 prompt 模板（如未来 K7 加 social-share-card / weibo-thumbnail / xhs-cover 等），**必须**：
-1. 在模板字符串里留 `{text_color_rules}` 占位符
-2. 对应的 `render_xxx_prompt(params)` 函数里调用 `merged = {"text_color_rules": TEXT_COLOR_RULES, **params}`
-
-不要在新模板里散写字色规则——会破坏宪法的跨模板一致性。
-
-**修改字色规则的正确方式**：直接改 `TEXT_COLOR_RULES` 常量字符串，所有模板自动生效。**不要**到各模板字符串里手动改。
-
-**反例**（曾经踩过的坑）：
-
-- ❌ INNER_V2_TEMPLATE 里散写「朱红/暖金不做正文字色」段——封面没生效，下次新模板要再写一遍
-- ✅ 抽离为 `TEXT_COLOR_RULES` 常量 + 占位符自动注入——一处改动全模板生效
-
----
-
-### 5.6 配色矩阵（与 K2/K5 共用）
-
-此矩阵与 `scripts/allin/generate_sketchnote.py`（K2）和 `scripts/shared/gen_image.py`（K5）共用，统一从 `scripts/shared/poster_template.py` 导入。
+`render_cover_prompt()` / `render_inner_prompt()` 自动合并三类常量：
 
 ```python
-COLOR_PALETTES = {
-    'A': {
-        'name': '轻盈派（亮色默认）',
-        'description': '粉蓝 #4A90E2 + 暖黄 #F5C842 + 米白 #F8F4ED + 深墨 #2D2D2D',
-        'primary': '#4A90E2', 'accent': '#F5C842', 'bg': '#F8F4ED',
-        'ink': '#2D2D2D', 'secondary': '#A8C4E0',
-    },
-    'B': {
-        'name': '清新派（亮色备选）',
-        'description': '薄荷青 #5DA68F + 杏粉 #E8B197 + 米白 #F8F4ED + 深墨 #2D2D2D',
-        'primary': '#5DA68F', 'accent': '#E8B197', 'bg': '#F8F4ED',
-        'ink': '#2D2D2D', 'secondary': '#B8D8CF',
-    },
-    'C': {
-        'name': '东方庄重派（深色，重型题材）',
-        'description': '朱红 #C73E2C + 暖金 #C8A35F（小面积）+ 米黄宣纸 #F5F2EA + 墨黑 #1A1A1A',
-        'primary': '#C73E2C', 'accent': '#C8A35F', 'bg': '#F5F2EA',
-        'ink': '#1A1A1A', 'secondary': '#8B2018',
-    },
-    'D': {
-        'name': '藏青现代派（深色，命运感题材）',
-        'description': '藏青 #1B365D + 暖金 #C8A35F + 米白 #F8F4ED + 朱砂红印章 #C73E2C（小面积）',
-        'primary': '#1B365D', 'accent': '#C8A35F', 'bg': '#F8F4ED',
-        'ink': '#1A1A1A', 'secondary': '#C73E2C',
-    },
+merged = {
+    "color_principles": COLOR_PRINCIPLES,
+    "emotion_hints": _format_emotion_hints(),
+    "text_color_rules": TEXT_COLOR_RULES,
+    **params,
 }
 ```
 
-**`pick_palette(record, override=None)` 判断逻辑（伪代码）**：
+`COVER_V2_TEMPLATE`、`INNER_V2_TEMPLATE` 和未来新模板都通过占位符接收这三段规则。修改色彩规则时，只改 `COLOR_PRINCIPLES`、`EMOTION_PALETTE_HINTS`、`TEXT_COLOR_RULES`，不在各模板里散写局部规则。
 
-```python
-def pick_palette(record: dict, override: str = None) -> dict:
-    if override in ('A', 'B', 'C', 'D'):
-        return COLOR_PALETTES[override]  # 主会话显式指定
+### 5.5c 未来加新模板的契约
 
-    keywords_deep = ['债务', '危机', '战争', '博弈', '算力争夺', '洗牌',
-                     '破产', '颠覆', '威胁', '争夺', '入侵', '垄断']
-    title = record.get('cn_title', '')
-    score = record.get('five_dim_score', 0)
+任何新加的 prompt 模板（如 future social-share-card / weibo-thumbnail / xhs-cover / 商品拆解变体），必须遵守：
 
-    if any(kw in title for kw in keywords_deep):
-        return COLOR_PALETTES['C']   # 朱红宣纸，重型题材
-    if score == 5:
-        return COLOR_PALETTES['D']   # 藏青命运感，五星题材无重型词
-    return COLOR_PALETTES['A']       # 默认轻盈派
-```
+1. 模板字符串里同时加入 `{color_principles}`、`{emotion_hints}`、`{text_color_rules}` 三个占位符。
+2. 对应 `render_xxx_prompt(params)` 函数必须 merge `COLOR_PRINCIPLES`、`_format_emotion_hints()`、`TEXT_COLOR_RULES` 三个常量。
+3. 修改色彩规则只改对应常量，所有模板自动同步；不要在模板字符串或调用方里重新实现色板选择。
+
+---
+
+### 5.6 配色原则与情绪库
+
+`scripts/shared/poster_template.py` 中的 `COLOR_PRINCIPLES` 是硬约束和软指导的总纲，覆盖情绪映射、配色克制、字色对比度、印章标签和同期一致性。
+
+`EMOTION_PALETTE_HINTS` 是情绪到色调的参考库，不是强制预设色板。当前包含危机/破产、算力/AI/科技、增长/创新、医疗/教育、能源/自然、博弈/对抗、电商/引流/轻盈和默认分支。AI 根据内容语境从库中参考并自由判断，调用方不再传 `palette` 参数。
 
 ---
 

@@ -57,10 +57,14 @@ COVER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 位置可在角落、贴着主体、或主标题边缘。要像低语、批注、墨迹，
 不要做成说明栏。可以用毛笔字或印章式排布。
 
-━━━━━ 七、色彩逻辑（克制 3-4 色）━━━━━
-推荐配色（本期选定色组 {palette}，按 poster_template.py 的 COLOR_PALETTES 配色矩阵执行）：
-整体气质要"高级、克制、展览级、印刷品质感"。
-不要俗艳拼色、不要数字渐变、不要商业插画风。
+━━━━━ 七、色彩逻辑 ━━━━━
+
+{color_principles}
+
+━━━━━ 七A、本期情绪建议（参考库） ━━━━━
+
+根据本期议题情绪，参考以下色调建议（不强制，AI 可自行判断）：
+{emotion_hints}
 
 {text_color_rules}
 
@@ -137,8 +141,6 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 - **不要在画面边缘 5% 范围内放重要文字**（手机查看时可能被裁切或挤压）
 - **整页独立视觉单元 ≤ 18 个**，否则手机查看会拥挤
 
-{text_color_rules}
-
 ━━━━━ 五、要点内容（参数注入）━━━━━
 {points}
 
@@ -146,19 +148,30 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 注意：每个 point 的 text 是给你的素材库，**你要从中提炼关键词条目**，不要把整段 text 当成唯一渲染内容。
 
 ━━━━━ 六、视觉一致性 ━━━━━
-- 与封面海报使用相同的色彩语言（本期色组 {palette}）
+- 与封面海报使用相同的色彩语言（遵守同一期 4 张内页 + 1 张封面共用同一组配色）
 - 手绘水彩 + 剪纸拼贴质感
 - 字体和封面保持一致（毛笔/书法/宋体艺术化）
 - 同一期 4 张内页保持类似的版面节奏（不要每张换截然不同的版式风格）
 
-━━━━━ 七、辅助文字 ━━━━━
+━━━━━ 七、色彩逻辑 ━━━━━
+
+{color_principles}
+
+━━━━━ 七A、本期情绪建议（参考库） ━━━━━
+
+根据本期议题情绪，参考以下色调建议（不强制，AI 可自行判断）：
+{emotion_hints}
+
+{text_color_rules}
+
+━━━━━ 八、辅助文字 ━━━━━
 允许在画面留白处加 1 句诗性短语（贯穿全页主题）：
 {aux_poetry}
 位置克制，像题跋或落款一样。
 
 底部右下角小字：「All In 中文笔记」（系列标识）
 
-━━━━━ 八、严禁 ━━━━━
+━━━━━ 九、严禁 ━━━━━
 - 不要做成 3 个矩形信息卡的拼接（必须有视觉融合）
 - 不要把 text 整段渲染（必须提炼出 3-5 个关键词条目）
 - 不要超过 18 个独立视觉单元（手机查看会拥挤）
@@ -174,80 +187,75 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 
 
 # ════════════════════════════════════════════════════════════
-# 文字字色宪法（跨模板共用，自动注入到 COVER/INNER 等所有模板）
+# 配色 / 文字字色宪法（跨模板共用，自动注入到 COVER/INNER 等所有模板）
 # ════════════════════════════════════════════════════════════
 # 设计原则：用户在 iPhone/小红书/飞书 wiki 里查看图片时，文字必须高对比度。
-# 朱红/暖金等装饰色对比度不够，不能用作正文字色。
-# 修改这个常量 = 所有模板（封面/内页/未来商品拆解新模板）字色规则同步生效。
-# 不要在各模板里散写字色规则——会破坏跨会话稳定性。
+COLOR_PRINCIPLES = """━━━━━ 配色 / 字色五条原则（所有模板必须遵守）━━━━━
 
-TEXT_COLOR_RULES = """━━━━━ 文字可读性宪法（所有模板必须遵守）━━━━━
+1. 配色情绪映射（软指导，根据本期议题情绪选色调）：
+   - 危机 / 破产 / 暴跌 / 债务 / 战争 → 深沉色（深红 / 墨黑 / 暖金）
+   - 算力 / AI / 芯片 / 基础设施 → 科技色（藏青 / 暖金 / 米白）
+   - 增长 / 开源 / 创新 / 技术工具 → 轻盈色（蓝 / 黄 / 米白）
+   - 医疗 / 教育 / 社区 / 温情 → 温和色（薄荷青 / 杏粉 / 米白）
+   - 能源 / 农业 / 自然 / 健康 → 自然色（绿 / 棕 / 米白）
+   - 博弈 / 对抗 / 政治 / 监管 → 张力色（朱红 / 墨黑）
+   - 默认 / 复合议题 → 暖中性色（暖灰 / 米白 / 一点深色强调）
+   AI 也可根据文化背景做微调（中国市场加金色暗示，欧洲加靛蓝等）。
 
-**主规则：可读文字一律用深色，朱红/暖金只做装饰**
+2. 配色克制（硬约束）：
+   每张图：1 个主色 + 1-2 个强调色 + 1 个装饰色 + 1 个中性背景 = ≤ 4 色
+   不要俗艳拼色、不要数字渐变、不要商业插画风。
 
-可读文字的字色（必须用深色）：
-- 墨黑 #1A1A1A / 深炭 #2D2D2D / 深灰 #404040 任选其一
-- 适用范围：副标题、标签、关键词条目、说明文字、诗性补白、署名、印章里的字
+3. 字色对比度（硬约束，WCAG AA 标准）：
+   可读字色与背景对比度 ≥ 4.5:1
+   - 反例：朱红 #C73E2C 字 + 米黄 #F5F2EA 底 ≈ 3.2:1（手机看不清，禁用）
+   - 正例：墨黑 #1A1A1A 字 + 米黄 #F5F2EA 底 ≈ 13:1（清晰）
+   - 正例：深蓝 #1A2C4E 字 + 暖黄 #F5C842 底 ≈ 11:1（清晰）
 
-朱红 / 暖金 / 浅色（仅用作装饰，不用作可读字色）：
-- 核心隐喻母题字（巨型主体字，可用毛笔朱红做艺术效果，但不算"正文"）
-- 装饰性印章背景、标题底色块
-- 墨点 / 星标 / 边框 / 装饰线
-- 章节大标题（最大那行，可用朱红强调）
+4. 印章式标签高对比度（硬约束）：
+   ✅ 深色字 + 鲜色底（如墨黑字 + 朱红印章底，对比度 ≥ 7:1）
+   ❌ 鲜色字 + 浅色底（如朱红字 + 米黄底，对比度通常 ≈ 2-3:1）
 
-**印章式标签**正确做法：深色字 + 朱红/米黄底（高对比度）
-**印章式标签**错误做法：朱红字 + 米黄底（对比度不足，禁用）
-
-**违反场景示例**（绝对避免）：
-- ❌ "SpaceX" 标签用朱红字 + 米黄宣纸背景 -> 手机看不清
-- ❌ 关键词条目用暖金字 + 米白底 -> 对比度不够
-- ✅ "SpaceX" 标签用墨黑字 + 朱红印章底 -> 清晰
-- ✅ 巨型主标题"算力入口"用毛笔朱红 + 米黄背景 -> 装饰性，不算正文阅读
+5. 同期一致性（硬约束）：
+   同一期 4 张内页 + 1 张封面共用同一组配色（不能每张换调色板）。
+   实现：在 build 函数里决定一次 emotion → 传给 5 张共用。
 """
 
 
-COLOR_PALETTES = {
-    "A": {
-        "name": "轻盈派（亮色默认）",
-        "description": "粉蓝 #4A90E2 + 暖黄 #F5C842 + 米白 #F8F4ED + 深墨 #2D2D2D",
-        "primary": "#4A90E2",
-        "accent": "#F5C842",
-        "bg": "#F8F4ED",
-        "ink": "#2D2D2D",
-        "secondary": "#A8C4E0",
-        "scene_keywords": ["默认", "轻盈", "产品", "增长", "消费", "工具", "乐观"],
-    },
-    "B": {
-        "name": "清新派（亮色备选）",
-        "description": "薄荷青 #5DA68F + 杏粉 #E8B197 + 米白 #F8F4ED + 深墨 #2D2D2D",
-        "primary": "#5DA68F",
-        "accent": "#E8B197",
-        "bg": "#F8F4ED",
-        "ink": "#2D2D2D",
-        "secondary": "#B8D8CF",
-        "scene_keywords": ["清新", "医疗", "教育", "协作", "社区", "生活方式"],
-    },
-    "C": {
-        "name": "东方庄重派（深色，重型题材）",
-        "description": "朱红 #C73E2C + 暖金 #C8A35F（小面积）+ 米黄宣纸 #F5F2EA + 墨黑 #1A1A1A",
-        "primary": "#C73E2C",
-        "accent": "#C8A35F",
-        "bg": "#F5F2EA",
-        "ink": "#1A1A1A",
-        "secondary": "#8B2018",
-        "scene_keywords": ["债务", "危机", "战争", "博弈", "破产", "颠覆", "威胁", "垄断"],
-    },
-    "D": {
-        "name": "藏青现代派（深色，命运感题材）",
-        "description": "藏青 #1B365D + 暖金 #C8A35F + 米白 #F8F4ED + 朱砂红印章 #C73E2C（小面积）",
-        "primary": "#1B365D",
-        "accent": "#C8A35F",
-        "bg": "#F8F4ED",
-        "ink": "#1A1A1A",
-        "secondary": "#C73E2C",
-        "scene_keywords": ["五星", "命运感", "算力", "能源", "芯片", "AI", "基础设施", "监管"],
-    },
+EMOTION_PALETTE_HINTS = {
+    "危机/破产": "深红 #B23A2C + 墨黑 #1A1A1A + 暖金 #C8A35F + 米黄宣纸 #F5F2EA（庄重）",
+    "算力/AI/科技": "藏青 #1B365D + 暖金 #C8A35F + 米白 #F8F4ED（权威+科技）",
+    "增长/创新": "粉蓝 #4A90E2 + 暖黄 #F5C842 + 米白 #F8F4ED（轻盈+乐观）",
+    "医疗/教育": "薄荷青 #5DA68F + 杏粉 #E8B197 + 米白 #F8F4ED（温和+人文）",
+    "能源/自然": "墨绿 #2F5D44 + 暖棕 #8B6F47 + 米白 #F8F4ED（沉稳+自然）",
+    "博弈/对抗": "朱红 #C73E2C + 墨黑 #1A1A1A + 米黄 #F5F2EA（冲击+张力）",
+    "电商/引流/轻盈": "粉蓝 #4A90E2 + 暖黄 #F5C842 + 米白 #F8F4ED（小红书电商风格）",
+    "默认": "暖灰 #4A4540 + 米白 #F8F4ED + 一点深色强调（中性）",
 }
+
+
+TEXT_COLOR_RULES = """━━━━━ 文字可读性宪法（语义对比度规则）━━━━━
+
+可读文字与背景对比度必须 ≥ 4.5:1（WCAG AA 标准，手机阅读基准）。
+
+可读文字范围：副标题、标签、关键词条目、说明文字、诗性补白、署名、印章里的字。
+
+具体颜色：根据本期 AI 选定的色调，从中选一个深色作可读字色（不规定具体 hex）。
+但必须满足对比度 ≥ 4.5:1。
+
+装饰色（强调色 / 主色 / 暖色）不作正文：
+- 仅用于：主标题母题字、印章背景、墨点星标、装饰线条
+- 装饰色 vs 背景对比度可以 ≥ 3:1（用作大字符或大色块时合规）
+
+印章式标签：
+- ✅ 深色字 + 鲜色底（高对比度 ≥ 7:1）
+- ❌ 鲜色字 + 浅色底（对比度通常 ≈ 2-3:1，禁用）
+
+反例对照：
+- ❌ 朱红 #C73E2C / 米黄 #F5F2EA = 3.2:1（不达标）
+- ✅ 墨黑 #1A1A1A / 米黄 #F5F2EA = 13:1（达标）
+- ✅ 深蓝 #1A2C4E / 暖黄 #F5C842 = 11:1（达标）
+"""
 
 
 METAPHOR_LIBRARY = {
@@ -338,64 +346,38 @@ METAPHOR_LIBRARY = {
 }
 
 
-def pick_palette(record: dict | str) -> dict:
-    """根据飞书记录内容自动选择配色，支持 forced_palette 强制覆盖。"""
-    if isinstance(record, str):
-        forced_palette = record.strip().upper()
-        if forced_palette in COLOR_PALETTES:
-            return COLOR_PALETTES[forced_palette]
-        record = {}
-
-    forced_palette = str(record.get("forced_palette", "")).strip().upper()
-    if forced_palette in COLOR_PALETTES:
-        return COLOR_PALETTES[forced_palette]
-
-    title = str(record.get("cn_title") or record.get("title") or "")
-    topic = str(record.get("topic") or record.get("主题分类") or "")
-    text = f"{title} {topic}"
-    score = record.get("five_dim_score", 0)
-
-    heavy_keywords = [
-        "债务",
-        "危机",
-        "战争",
-        "博弈",
-        "算力争夺",
-        "洗牌",
-        "破产",
-        "颠覆",
-        "威胁",
-        "争夺",
-        "入侵",
-        "垄断",
-    ]
-    destiny_keywords = ["算力", "能源", "芯片", "AI监管", "监管", "数据主权", "基础设施"]
-    fresh_keywords = ["医疗", "教育", "协作", "社区", "生活方式"]
-
-    if any(keyword in text for keyword in heavy_keywords):
-        return COLOR_PALETTES["C"]
-    if score == 5 or any(keyword in text for keyword in destiny_keywords):
-        return COLOR_PALETTES["D"]
-    if any(keyword in text for keyword in fresh_keywords):
-        return COLOR_PALETTES["B"]
-    return COLOR_PALETTES["A"]
+def _format_emotion_hints() -> str:
+    lines = []
+    for emotion, hint in EMOTION_PALETTE_HINTS.items():
+        lines.append(f"  {emotion}：{hint}")
+    return "\n".join(lines)
 
 
 def render_cover_prompt(params: dict) -> str:
     """Render the cover poster prompt from explicit template parameters.
 
-    自动注入 TEXT_COLOR_RULES（字色宪法），确保所有模板字色规则一致。
+    自动注入配色原则、情绪库和字色宪法，确保所有模板规则一致。
     """
-    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    merged = {
+        "color_principles": COLOR_PRINCIPLES,
+        "emotion_hints": _format_emotion_hints(),
+        "text_color_rules": TEXT_COLOR_RULES,
+        **params,
+    }
     return COVER_V2_TEMPLATE.format(**merged)
 
 
 def render_inner_prompt(params: dict) -> str:
     """Render the inner-page poster prompt from explicit template parameters.
 
-    自动注入 TEXT_COLOR_RULES（字色宪法），确保所有模板字色规则一致。
+    自动注入配色原则、情绪库和字色宪法，确保所有模板规则一致。
     """
-    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    merged = {
+        "color_principles": COLOR_PRINCIPLES,
+        "emotion_hints": _format_emotion_hints(),
+        "text_color_rules": TEXT_COLOR_RULES,
+        **params,
+    }
     return INNER_V2_TEMPLATE.format(**merged)
 
 
@@ -405,7 +387,6 @@ if __name__ == "__main__":
         "date": "2026-04-24",
         "core_word": "算力入口",
         "points": "- 工具是入口\n- 算力是终局\n- 第四朵云崛起",
-        "palette": "D",
         "aux_poetry": "- 「工具是入口，算力是终局」\n- 「咽喉之争」",
         "forbidden": "",
         "context": "讨论 SpaceX 申请收购 AI 编程工具 Cursor，把编程工具当作切入企业算力市场的入口。",

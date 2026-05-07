@@ -109,22 +109,6 @@ def format_duration(duration) -> str:
     return text if text.endswith('分钟') else f"{text}分钟"
 
 
-def palette_label(palette: dict) -> str:
-    for key, value in poster_template.COLOR_PALETTES.items():
-        if value == palette:
-            return f"{key}（{value['name']}：{value['description']}）"
-    return str(palette.get('name') or palette)
-
-
-def pick_palette_for_record(record: dict) -> dict:
-    """把飞书中文字段补成 poster_template.pick_palette 可识别的别名。"""
-    normalized = dict(record)
-    normalized.setdefault('cn_title', record.get('中文标题', ''))
-    normalized.setdefault('topic', record.get('主题分类', ''))
-    normalized.setdefault('five_dim_score', record.get('五维综合评分', 0))
-    return poster_template.pick_palette(normalized)
-
-
 def strip_feishu_tags(text: str) -> str:
     """剥离飞书富文本标签（<text color="...">...</text> / <callout .../> 等），
     保留内部纯文本。否则 short_phrase 会把标签字符当成普通字符处理，
@@ -250,9 +234,8 @@ def format_metaphor_options(key: str) -> str:
     )
 
 
-def build_cover_params(record: dict, analysis: dict, palette: dict | None = None) -> dict:
+def build_cover_params(record: dict, analysis: dict) -> dict:
     """提取 cover_v2 模板填空参数。"""
-    palette = palette or pick_palette_for_record(record)
     five_dim_raw = analysis.get('five_dim', '')
     dim1 = extract_dim(five_dim_raw, '①')
     dim2 = extract_dim(five_dim_raw, '②')
@@ -289,10 +272,8 @@ def build_cover_params(record: dict, analysis: dict, palette: dict | None = None
             "让观者无需读解释也能感到议题重量。"
         ),
         'metaphor_options': format_metaphor_options(metaphor_key),
-        'palette': palette_label(palette),
         'aux_poetry': '\n'.join(f"- 「{item}」" for item in sub_words[:2]),
         'forbidden': '',
-        'palette_dict': palette,
     }
 
 
@@ -342,9 +323,8 @@ def format_points(points: list[dict]) -> str:
     )
 
 
-def build_inner_params(record: dict, analysis: dict, page_index: int, palette: dict | None = None) -> dict:
+def build_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
     """提取 inner_v2 模板填空参数。page_index: 0=核心议题, 1=市场判断, 2=四人立场, 3=国内启示。"""
-    palette = palette or pick_palette_for_record(record)
     five_dim_raw = analysis.get('five_dim', '')
     quotes_text = analysis.get('quotes', '')
     dim1 = extract_dim(five_dim_raw, '①')
@@ -420,25 +400,20 @@ def build_inner_params(record: dict, analysis: dict, page_index: int, palette: d
         'page_subtitle': spec['subtitle'],
         'points': points,
         'cross_page_motif_hint': f"{spec['motif']} 隐喻方向参考「{metaphor_key}」：{metaphor_hint}",
-        'palette': palette_label(palette),
         'aux_poetry': f"「{aux_poetry}」",
-        'palette_dict': palette,
     }
 
 
 def render_inner_from_params(params: dict) -> str:
     render_params = dict(params)
     render_params['points'] = format_points(params['points'])
-    render_params.pop('palette_dict', None)
     return poster_template.render_inner_prompt(render_params)
 
 
 def build_page_prompts(record: dict, analysis: dict) -> list:
     """生成 1 张 cover_v2 + 4 张 inner_v2 的 V2 海报提示词。"""
-    palette = pick_palette_for_record(record)
-    cover_params = build_cover_params(record, analysis, palette)
+    cover_params = build_cover_params(record, analysis)
     cover_render_params = dict(cover_params)
-    cover_render_params.pop('palette_dict', None)
 
     pages = [{
         'page_num': 1,
@@ -447,7 +422,7 @@ def build_page_prompts(record: dict, analysis: dict) -> list:
     }]
 
     for page_index, title in enumerate(['核心议题', '市场判断', '四人立场', '国内启示']):
-        params = build_inner_params(record, analysis, page_index, palette)
+        params = build_inner_params(record, analysis, page_index)
         pages.append({
             'page_num': page_index + 2,
             'title': title,

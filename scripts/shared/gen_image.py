@@ -42,7 +42,6 @@ MIN_IMAGE_BYTES = 10 * 1024
 sys.path.insert(0, str(SCRIPT_DIR))
 from poster_template import (  # noqa: E402
     METAPHOR_LIBRARY,
-    pick_palette,
     render_cover_prompt,
     render_inner_prompt,
 )
@@ -164,15 +163,6 @@ def _format_points(points: list[str]) -> str:
     return "\n".join(f"- {point}" for point in points[:3])
 
 
-def _pick_product_palette() -> dict[str, Any]:
-    """商品拆解固定走亮色组，避免 K6 深色组自动命中。"""
-    return pick_palette({"forced_palette": "A"})
-
-
-def _palette_label(palette: dict[str, Any]) -> str:
-    return str(palette.get("name") or palette.get("description") or "A")
-
-
 def _lookup_metaphor(core_word: str, findings: list[dict[str, str]]) -> str:
     if core_word in METAPHOR_LIBRARY:
         return "\n".join(METAPHOR_LIBRARY[core_word])
@@ -196,6 +186,10 @@ def _productize_prompt(prompt: str) -> str:
         "「ALL IN PODCAST 中文知识库」": "「商品拆解笔记」",
         "- 四位主播名：Jason · Chamath · Sacks · Friedberg（小字嵌入侧边或底部，像署名一样克制）\n": "",
         "底部右下角小字：「All In 中文笔记」（系列标识）": "底部右下角小字：「产品拆解笔记」（系列标识）",
+        "根据本期议题情绪，参考以下色调建议（不强制，AI 可自行判断）：": (
+            "本批是商品拆解，建议参考情绪库中电商/引流/轻盈分支。\n"
+            "根据本期议题情绪，参考以下色调建议（不强制，AI 可自行判断）："
+        ),
     }
     for old, new in replacements.items():
         prompt = prompt.replace(old, new)
@@ -231,9 +225,6 @@ def build_product_breakdown_prompts(
     dim3 = extract_dim(text, "③")
     dim5 = extract_dim(text, "⑤")
 
-    palette = _pick_product_palette()
-    palette_text = _palette_label(palette)
-
     cover_core = product_name
     business_core = f"{category}商业引擎"
     traffic_core = f"{traffic_entry}流量漏斗"
@@ -257,7 +248,6 @@ def build_product_breakdown_prompts(
                 "date": date,
                 "core_word": cover_core,
                 "points": cover_points,
-                "palette": palette_text,
                 "aux_poetry": "- 「把一个商品拆成一张商业地图」\n- 「看见流量背后的结构」",
                 "forbidden": "- 不要出现推荐、种草、必买、安利等消费诱导措辞",
                 "context": f"这是一份小红书电商商品拆解，核心商品是「{product_name}」，主营品类是「{category}」，主要流量入口是「{traffic_entry}」。",
@@ -292,7 +282,6 @@ def build_product_breakdown_prompts(
                         extract_bullets(dim1 + "\n" + dim3, 3)
                         or [f"产品形态：{category}", f"定价观察：{price}", "成本结构：从交付方式与内容密度推算"]
                     ),
-                    "palette": palette_text,
                     "aux_poetry": "一个商品，是一台被流量推动的商业引擎。",
                 }
                 )
@@ -316,7 +305,6 @@ def build_product_breakdown_prompts(
                         extract_bullets(dim2, 3)
                         or [f"入口：{traffic_entry}", "路径：内容曝光 -> 私信/店铺 -> 下单", f"结果：{sales}"]
                     ),
-                    "palette": palette_text,
                     "aux_poetry": "流量不是水流，而是一串可复盘的转化节点。",
                 }
                 )
@@ -340,7 +328,6 @@ def build_product_breakdown_prompts(
                         extract_bullets(dim5, 3)
                         or ["可借鉴：复制卖点结构而非照搬商品", f"切入点：围绕{category}做细分", "风险：同质化与平台规则变化"]
                     ),
-                    "palette": palette_text,
                     "aux_poetry": "机会不是答案，是地图上的下一枚标记。",
                 }
                 )
