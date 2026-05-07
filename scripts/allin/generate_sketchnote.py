@@ -386,7 +386,7 @@ def find_codex_companion() -> list[str] | None:
         return [companion]
 
     root = Path.home() / '.claude/plugins/cache/openai-codex'
-    candidates = sorted(root.glob('*/scripts/codex-companion.mjs'), key=lambda path: path.parent.parent.name)
+    candidates = sorted(root.glob('*/*/scripts/codex-companion.mjs'), key=lambda path: path.parent.parent.name)
     if candidates:
         mjs_path = candidates[-1]
         print(f"codex-companion 路径：{mjs_path}", file=sys.stderr)
@@ -413,7 +413,7 @@ def generate_via_codex(prompt: str, page_num: int, output_path: Path) -> bool:
             [*companion_cmd, 'task', task],
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=300,
             check=False,
         )
     except Exception as exc:
@@ -461,7 +461,7 @@ def generate_image(prompt: str, page_num: int, output_path: Path,
                 prompt=prompt,
                 n=1,
                 size="1024x1536",        # 3:4 竖版
-                timeout=120,
+                timeout=300,
                 # 不传 response_format，避免中转站不兼容
             )
             # response 可能是 ImagesResponse 对象或 dict

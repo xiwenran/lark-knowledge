@@ -361,7 +361,7 @@ def generate_via_codex(prompt: str, output_path: Path, page_num: int = 0) -> boo
     else:
         root = Path.home() / ".claude/plugins/cache/openai-codex"
         candidates = sorted(
-            root.glob("*/scripts/codex-companion.mjs"),
+            root.glob("*/*/scripts/codex-companion.mjs"),
             key=lambda path: path.parent.parent.name,
         )
         if candidates:
@@ -384,7 +384,7 @@ def generate_via_codex(prompt: str, output_path: Path, page_num: int = 0) -> boo
             [*companion_cmd, "task", task],
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=300,
             check=False,
         )
     except Exception as exc:
@@ -442,7 +442,7 @@ def generate_image(
                 prompt=prompt,
                 n=1,
                 size=size,
-                timeout=120,
+                timeout=300,
             )
             items = resp.data if hasattr(resp, "data") else resp.get("data", [])
             item = items[0]
