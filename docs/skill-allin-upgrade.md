@@ -657,6 +657,52 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 
 ---
 
+### 5.5b 字色宪法（跨模板共用，自动注入）
+
+**位置**：`scripts/shared/poster_template.py` 顶部，`COLOR_PALETTES` 之前
+
+**为什么单独立成宪法**：用户实测发现「朱红字 + 米黄宣纸底」在 iPhone 上对比度不够、看不清。如果只在 INNER_V2_TEMPLATE 里写一段字色规则，COVER_V2_TEMPLATE 和未来新模板（如商品拆解卡片、社交分享图）都不会自动生效——破坏跨会话稳定性。
+
+**实现**：
+
+```python
+TEXT_COLOR_RULES = """━━━━━ 文字可读性宪法（所有模板必须遵守）━━━━━
+**主规则：可读文字一律用深色，朱红/暖金只做装饰**
+... 详见 poster_template.py
+"""
+```
+
+**自动注入**：
+
+```python
+def render_cover_prompt(params: dict) -> str:
+    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    return COVER_V2_TEMPLATE.format(**merged)
+
+def render_inner_prompt(params: dict) -> str:
+    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    return INNER_V2_TEMPLATE.format(**merged)
+```
+
+`COVER_V2_TEMPLATE` 和 `INNER_V2_TEMPLATE` 都含 `{text_color_rules}` 占位符；render 函数自动把 TEXT_COLOR_RULES 合并到参数字典中。
+
+**对未来新模板的要求**（重要）：
+
+任何新加的 prompt 模板（如未来 K7 加 social-share-card / weibo-thumbnail / xhs-cover 等），**必须**：
+1. 在模板字符串里留 `{text_color_rules}` 占位符
+2. 对应的 `render_xxx_prompt(params)` 函数里调用 `merged = {"text_color_rules": TEXT_COLOR_RULES, **params}`
+
+不要在新模板里散写字色规则——会破坏宪法的跨模板一致性。
+
+**修改字色规则的正确方式**：直接改 `TEXT_COLOR_RULES` 常量字符串，所有模板自动生效。**不要**到各模板字符串里手动改。
+
+**反例**（曾经踩过的坑）：
+
+- ❌ INNER_V2_TEMPLATE 里散写「朱红/暖金不做正文字色」段——封面没生效，下次新模板要再写一遍
+- ✅ 抽离为 `TEXT_COLOR_RULES` 常量 + 占位符自动注入——一处改动全模板生效
+
+---
+
 ### 5.6 配色矩阵（与 K2/K5 共用）
 
 此矩阵与 `scripts/allin/generate_sketchnote.py`（K2）和 `scripts/shared/gen_image.py`（K5）共用，统一从 `scripts/shared/poster_template.py` 导入。

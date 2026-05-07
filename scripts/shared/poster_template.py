@@ -62,6 +62,8 @@ COVER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 整体气质要"高级、克制、展览级、印刷品质感"。
 不要俗艳拼色、不要数字渐变、不要商业插画风。
 
+{text_color_rules}
+
 ━━━━━ 八、风格质感 ━━━━━
 强烈倾向：手绘水彩 + 剪纸拼贴 + 石版印刷 + 丝网印刷 + 纸张颗粒 + 笔触温度。
 画面应有"被人手做出来"的痕迹，而非"AI 生成"的光滑感。
@@ -135,12 +137,7 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 - **不要在画面边缘 5% 范围内放重要文字**（手机查看时可能被裁切或挤压）
 - **整页独立视觉单元 ≤ 18 个**，否则手机查看会拥挤
 
-**文字可读性优先级（必须遵守）**：
-- 所有需要阅读的文字（要点标签 / 关键词条目 / 说明文字 / 诗性补白）必须用**深色**：墨黑 #1A1A1A、深炭、深灰
-- **不允许**用朱红、暖金、浅色作为主要可读文字色——这些颜色对比度不够，手机上看不清
-- 朱红 / 暖金只用于：核心隐喻母题字（巨型主体字，可用毛笔朱红）、装饰性印章背景、标题底色块、墨点/星标等装饰
-- 印章式标签可用「深色字 + 朱红/米黄底」的组合（高对比度），不要用「朱红字 + 米黄底」（低对比度）
-- 章节大标题可用毛笔朱红强调，但其他正文级别的文字不要
+{text_color_rules}
 
 ━━━━━ 五、要点内容（参数注入）━━━━━
 {points}
@@ -173,6 +170,39 @@ INNER_V2_TEMPLATE = """你是一位顶级海报艺术家，正在创作 All In P
 ━━━━━ 输出 ━━━━━
 竖版 3:4 比例。让读者在手机上翻到这页时感到：
 画面有意境、信息有重量、关键词清晰可读、阅读有节奏、视觉有惊喜。
+"""
+
+
+# ════════════════════════════════════════════════════════════
+# 文字字色宪法（跨模板共用，自动注入到 COVER/INNER 等所有模板）
+# ════════════════════════════════════════════════════════════
+# 设计原则：用户在 iPhone/小红书/飞书 wiki 里查看图片时，文字必须高对比度。
+# 朱红/暖金等装饰色对比度不够，不能用作正文字色。
+# 修改这个常量 = 所有模板（封面/内页/未来商品拆解新模板）字色规则同步生效。
+# 不要在各模板里散写字色规则——会破坏跨会话稳定性。
+
+TEXT_COLOR_RULES = """━━━━━ 文字可读性宪法（所有模板必须遵守）━━━━━
+
+**主规则：可读文字一律用深色，朱红/暖金只做装饰**
+
+可读文字的字色（必须用深色）：
+- 墨黑 #1A1A1A / 深炭 #2D2D2D / 深灰 #404040 任选其一
+- 适用范围：副标题、标签、关键词条目、说明文字、诗性补白、署名、印章里的字
+
+朱红 / 暖金 / 浅色（仅用作装饰，不用作可读字色）：
+- 核心隐喻母题字（巨型主体字，可用毛笔朱红做艺术效果，但不算"正文"）
+- 装饰性印章背景、标题底色块
+- 墨点 / 星标 / 边框 / 装饰线
+- 章节大标题（最大那行，可用朱红强调）
+
+**印章式标签**正确做法：深色字 + 朱红/米黄底（高对比度）
+**印章式标签**错误做法：朱红字 + 米黄底（对比度不足，禁用）
+
+**违反场景示例**（绝对避免）：
+- ❌ "SpaceX" 标签用朱红字 + 米黄宣纸背景 -> 手机看不清
+- ❌ 关键词条目用暖金字 + 米白底 -> 对比度不够
+- ✅ "SpaceX" 标签用墨黑字 + 朱红印章底 -> 清晰
+- ✅ 巨型主标题"算力入口"用毛笔朱红 + 米黄背景 -> 装饰性，不算正文阅读
 """
 
 
@@ -352,13 +382,21 @@ def pick_palette(record: dict | str) -> dict:
 
 
 def render_cover_prompt(params: dict) -> str:
-    """Render the cover poster prompt from explicit template parameters."""
-    return COVER_V2_TEMPLATE.format(**params)
+    """Render the cover poster prompt from explicit template parameters.
+
+    自动注入 TEXT_COLOR_RULES（字色宪法），确保所有模板字色规则一致。
+    """
+    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    return COVER_V2_TEMPLATE.format(**merged)
 
 
 def render_inner_prompt(params: dict) -> str:
-    """Render the inner-page poster prompt from explicit template parameters."""
-    return INNER_V2_TEMPLATE.format(**params)
+    """Render the inner-page poster prompt from explicit template parameters.
+
+    自动注入 TEXT_COLOR_RULES（字色宪法），确保所有模板字色规则一致。
+    """
+    merged = {"text_color_rules": TEXT_COLOR_RULES, **params}
+    return INNER_V2_TEMPLATE.format(**merged)
 
 
 if __name__ == "__main__":
