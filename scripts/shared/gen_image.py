@@ -384,12 +384,14 @@ def generate_via_codex(prompt: str, output_path: Path, page_num: int = 0) -> boo
             [*companion_cmd, "task", task],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=180,
             check=False,
         )
     except Exception as exc:
         print(f"warn: {label} Codex 失败：{exc}")
         return False
+    finally:
+        prompt_path.unlink(missing_ok=True)
 
     if result.returncode != 0:
         msg = (result.stderr or result.stdout or "").strip().splitlines()
@@ -435,7 +437,13 @@ def generate_image(
     while failures < retry:
         attempt = failures
         try:
-            resp = client.images.generate(model=image_model, prompt=prompt, n=1, size=size)
+            resp = client.images.generate(
+                model=image_model,
+                prompt=prompt,
+                n=1,
+                size=size,
+                timeout=120,
+            )
             items = resp.data if hasattr(resp, "data") else resp.get("data", [])
             item = items[0]
 

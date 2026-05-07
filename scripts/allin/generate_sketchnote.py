@@ -413,12 +413,14 @@ def generate_via_codex(prompt: str, page_num: int, output_path: Path) -> bool:
             [*companion_cmd, 'task', task],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=180,
             check=False,
         )
     except Exception as exc:
         print(f"  ⚠️  第 {page_num} 张 Codex 失败：{exc}")
         return False
+    finally:
+        prompt_path.unlink(missing_ok=True)
 
     if result.returncode != 0:
         msg = (result.stderr or result.stdout or '').strip().splitlines()
@@ -459,6 +461,7 @@ def generate_image(prompt: str, page_num: int, output_path: Path,
                 prompt=prompt,
                 n=1,
                 size="1024x1536",        # 3:4 竖版
+                timeout=120,
                 # 不传 response_format，避免中转站不兼容
             )
             # response 可能是 ImagesResponse 对象或 dict

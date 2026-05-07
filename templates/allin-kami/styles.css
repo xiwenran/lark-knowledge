@@ -324,7 +324,7 @@ body {
 /* ── 英文原文旧样式（兼容）── */
 .en-text {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--stone);
   line-height: 1.6;
   margin: 4px 0 12px 0;
