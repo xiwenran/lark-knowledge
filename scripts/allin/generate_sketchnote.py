@@ -142,42 +142,44 @@ _TRAILING_PARTICLES = '的了着过吧呢么么呀啊嘛'  # 助词
 _TRAILING_PREPOSITIONS = '在对从向到给为让使被由以与和及或者而'  # 介词/连词
 
 
-def short_phrase(text: str, fallback: str, max_len: int = 14) -> str:
+def short_phrase(text: str, fallback: str, max_len: int = 14, exclude: set = None) -> str:
     """提取标签短语。优先级：
     1. METAPHOR_LIBRARY 预设词命中（如「算力入口」「债务炸弹」）
     2. 英文名词或大写缩写（如 SpaceX / Cursor / SaaS / AWS）
     3. 中文首句截断 + 虚词尾保护（避免「算力即入口的」「氯吡硫磷在国」这类切割）
+
+    exclude: 已使用的 label 集合，命中已用的会跳到下一个候选（避免同一期多个 point label 重复）。
     """
+    exclude = exclude or set()
     text = strip_feishu_tags(text)
     text = re.sub(r'^[①②③④⑤一二三四五六七八九十、：:\s]+', '', text).strip()
 
-    # 优先 1：METAPHOR_LIBRARY 全文命中
+    # 优先 1：METAPHOR_LIBRARY 全文命中（找第一个未被使用的）
     for key in poster_template.METAPHOR_LIBRARY:
-        if key in text:
+        if key in text and key not in exclude:
             return key
 
-    # 优先 2a：连续两个大写词组合（如 "App Store"、"Google Cloud"）
-    m = re.search(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]+\s+[A-Z][A-Za-z0-9]+)(?=[^A-Za-z]|$)', text)
-    if m:
-        return m.group(1)
+    # 优先 2a：连续两个大写词组合（如 "App Store"、"Google Cloud"），找第一个未被使用的
+    for m in re.finditer(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]+\s+[A-Z][A-Za-z0-9]+)(?=[^A-Za-z]|$)', text):
+        if m.group(1) not in exclude:
+            return m.group(1)
     # 优先 2b：单个大写词（缩写或名词），至少 4 字符（避开 App/End/Big 等常见短词）
     # 注：不用 \b（Python 3 中文是 \w，"果" 与 "A" 之间无 word boundary，会跳过 App 误匹配 Store）
-    m = re.search(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]{3,15})(?=[^A-Za-z]|$)', text)
-    if m:
-        return m.group(1)
+    for m in re.finditer(r'(?:^|[^A-Za-z])([A-Z][A-Za-z0-9]{3,15})(?=[^A-Za-z]|$)', text):
+        if m.group(1) not in exclude:
+            return m.group(1)
 
     # 中文：取首句到第一个标点
-    text = re.sub(r'[，。；;：:、\n].*$', '', text).strip()
-    text = re.sub(r'[^\w一-鿿&+·-]', '', text)
+    chinese_text = re.sub(r'[，。；;：:、\n].*$', '', text).strip()
+    chinese_text = re.sub(r'[^\w一-鿿&+·-]', '', chinese_text)
 
-    if not text:
+    if not chinese_text:
         return fallback
 
-    if len(text) <= max_len:
-        # 整个短句都没超长，但仍要去虚词尾
-        truncated = text
+    if len(chinese_text) <= max_len:
+        truncated = chinese_text
     else:
-        truncated = text[:max_len]
+        truncated = chinese_text[:max_len]
 
     # 虚词尾保护：先去助词尾（如「的」），再去「介词+单字」尾（如「在国」「向人」）
     while len(truncated) > 2 and truncated[-1] in _TRAILING_PARTICLES:
@@ -185,6 +187,17 @@ def short_phrase(text: str, fallback: str, max_len: int = 14) -> str:
     truncated = re.sub(rf'[{_TRAILING_PREPOSITIONS}][^a-zA-Z]{{1,2}}$', '', truncated)
     while len(truncated) > 2 and truncated[-1] in _TRAILING_PARTICLES:
         truncated = truncated[:-1]
+
+    if truncated and truncated not in exclude:
+        return truncated
+
+    # 如果中文 fallback 也重复，再尝试取第二个短句
+    rest = re.sub(r'^[^，。；;：:、\n]*[，。；;：:、\n]+', '', text).strip()
+    if rest:
+        rest_clean = re.sub(r'[，。；;：:、\n].*$', '', rest)
+        rest_clean = re.sub(r'[^\w一-鿿&+·-]', '', rest_clean)[:max_len]
+        if rest_clean and rest_clean not in exclude:
+            return rest_clean
 
     return truncated or fallback
 
@@ -306,12 +319,16 @@ def extract_stance(text: str, name: str) -> str:
 
 
 def build_points(text: str, fallbacks: list[str], icon_hint: str) -> list[dict]:
+    """构造 3 个 point，确保 label 互不重复（避免同一页 SpaceX/SpaceX/Cursor 这种 bug）。"""
     bullets = extract_bullets(text, len(fallbacks))
     points = []
+    used_labels = set()
     for idx, fallback in enumerate(fallbacks):
         body = bullets[idx] if idx < len(bullets) else fallback
+        label = short_phrase(body, fallback, 14, exclude=used_labels)
+        used_labels.add(label)
         points.append({
-            'label': short_phrase(body, fallback, 14),
+            'label': label,
             'text': body,
             'icon_hint': icon_hint,
         })
