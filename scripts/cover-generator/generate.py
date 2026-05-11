@@ -3,21 +3,19 @@
 封面生成脚本 — 输入标题+期号，输出 1080×1350 PNG。
 
 用法：
-  # 商品拆解封面
+  python generate.py allin \
+    --title "你花钱订阅的" "SaaS 可能" "正在等死" \
+    --subtitle "按席位收费的时代" "可能真的要变了" \
+    --info "All In Podcast · E270" \
+    --number 270 \
+    -o cover_allin.png
+
   python generate.py breakdown \
     --title "9块9的备课资料" "卖的不是" "PPT" \
     --subtitle "买家花的不是9块9买50页PPT" "是省掉3小时备课时间" \
     --info "教师备课资料包 · 9.9元 · 4000+单" \
     --number 012 \
     -o cover_breakdown.png
-
-  # All In Podcast 封面
-  python generate.py allin \
-    --title "你花钱订阅的" "SaaS 可能" "正在等死" \
-    --subtitle "当AI可以直接给你结果" "工具还值钱吗？" \
-    --info "All In Podcast · E270" \
-    --number 270 \
-    -o cover_allin.png
 
 标题最后一行自动使用强调色高亮。
 """
@@ -27,28 +25,35 @@ import re
 import xml.etree.ElementTree as ET
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SVG_NS = "http://www.w3.org/2000/svg"
+TAG_TEXT = f"{{{SVG_NS}}}text"
+TAG_TSPAN = f"{{{SVG_NS}}}tspan"
 
 TEMPLATES = {
     "breakdown": {
         "svg": os.path.join(SCRIPT_DIR, "breakdown.svg"),
         "brand": "虚拟产品实操手记",
         "footer_prefix": "BREAKDOWN · NO.",
-        "accent_attr": "fill",  # 用于检测强调色
     },
     "allin": {
         "svg": os.path.join(SCRIPT_DIR, "allin.svg"),
         "brand": "ALL IN PODCAST",
         "footer_prefix": "ALL IN · VOL.",
-        "accent_attr": "fill",
     },
 }
 
-NS = {"svg": "http://www.w3.org/2000/svg"}
+
+def _find_by_id(root, element_id):
+    """按 id 查找 SVG 元素（优先路径）。"""
+    for elem in root.iter():
+        if elem.get("id") == element_id:
+            return elem
+    return None
 
 
 def _find_text_by_content(root, keyword):
-    """在 SVG 中找包含特定文字的 <text> 或 <tspan> 元素。"""
-    for elem in root.iter("{http://www.w3.org/2000/svg}text"):
+    """按文本内容查找 <text> 元素（fallback 路径）。"""
+    for elem in root.iter(TAG_TEXT):
         if elem.text and keyword in elem.text:
             return elem
         for child in elem:
@@ -57,139 +62,164 @@ def _find_text_by_content(root, keyword):
     return None
 
 
+def _find_title_by_style(root):
+    """按 font-weight=900 + 多 tspan 查找标题（兜底路径）。"""
+    for text_el in root.iter(TAG_TEXT):
+        if text_el.get("font-weight") == "900":
+            tspans = list(text_el.iter(TAG_TSPAN))
+            if len(tspans) >= 2:
+                return text_el
+    return None
+
+
+def _find_subtitle_by_style(root):
+    """按 opacity<1 + font-size + tspan 查找副标题（兜底路径）。"""
+    for text_el in root.iter(TAG_TEXT):
+        op = text_el.get("opacity", "")
+        if op:
+            try:
+                if float(op) < 1.0 and text_el.get("font-size"):
+                    tspans = list(text_el.iter(TAG_TSPAN))
+                    if tspans:
+                        return text_el
+            except ValueError:
+                pass
+    return None
+
+
+def _replace_title(title_elem, title_lines):
+    """替换主标题 tspan，最后一行自动用强调色。"""
+    old_tspans = list(title_elem.iter(TAG_TSPAN))
+    if not old_tspans:
+        return
+
+    first_attribs = dict(old_tspans[0].attrib)
+    accent_color = None
+    if old_tspans:
+        last = old_tspans[-1]
+        if last.get("fill") and last.get("fill") != title_elem.get("fill"):
+            accent_color = last.get("fill")
+
+    font_size = first_attribs.get("font-size", "128")
+    x_val = first_attribs.get("x", "80")
+    line_dy = "160"
+    if len(old_tspans) >= 2:
+        d = old_tspans[1].get("dy", "160")
+        if d != "0":
+            line_dy = d
+
+    for ts in old_tspans:
+        title_elem.remove(ts)
+    title_elem.text = None
+
+    for i, line in enumerate(title_lines):
+        ts = ET.SubElement(title_elem, TAG_TSPAN)
+        ts.set("font-size", font_size)
+        ts.set("x", x_val)
+        ts.set("dy", "0" if i == 0 else line_dy)
+        if i == len(title_lines) - 1 and accent_color:
+            ts.set("fill", accent_color)
+        ts.text = line
+
+
+def _replace_subtitle(subtitle_elem, subtitle_lines):
+    """替换副标题 tspan。"""
+    old_tspans = list(subtitle_elem.iter(TAG_TSPAN))
+    first_attribs = dict(old_tspans[0].attrib) if old_tspans else {}
+    x_val = first_attribs.get("x", "80")
+    line_dy = "72"
+    if len(old_tspans) >= 2:
+        d = old_tspans[1].get("dy", "72")
+        if d != "0":
+            line_dy = d
+
+    for ts in old_tspans:
+        subtitle_elem.remove(ts)
+    subtitle_elem.text = None
+
+    for i, line in enumerate(subtitle_lines):
+        ts = ET.SubElement(subtitle_elem, TAG_TSPAN)
+        ts.set("x", x_val)
+        ts.set("dy", "0" if i == 0 else line_dy)
+        ts.text = line
+
+
 def generate_cover(template_name, title_lines, subtitle_lines, info_text,
                    number, output_path, brand_override=None):
     """生成封面 PNG。"""
     cfg = TEMPLATES[template_name]
-    svg_path = cfg["svg"]
 
-    with open(svg_path, "r", encoding="utf-8") as f:
+    with open(cfg["svg"], "r", encoding="utf-8") as f:
         svg_content = f.read()
 
-    # --- 替换水印期号 ---
-    # 水印是那个 font-size="420" 或 "480" 的超大文字
-    svg_content = re.sub(
-        r'(font-size="4[0-9]{2}"[^>]*>)[^<]*(</text>)',
-        rf'\g<1>{number}\2',
-        svg_content,
-    )
-
-    # --- 替换底部角标 ---
-    footer_text = f"{cfg['footer_prefix']}{number}"
-    svg_content = re.sub(
-        r'(letter-spacing="6">)[^<]*(</text>)',
-        rf'\1{footer_text}\2',
-        svg_content,
-    )
-
-    # --- 解析为 XML 做精确替换 ---
-    ET.register_namespace("", "http://www.w3.org/2000/svg")
+    ET.register_namespace("", SVG_NS)
     root = ET.fromstring(svg_content)
 
-    # 找主标题 <text> 块（font-weight="900" 且包含 tspan）
-    title_elem = None
-    for text_el in root.iter("{http://www.w3.org/2000/svg}text"):
-        if text_el.get("font-weight") == "900":
-            tspans = list(text_el.iter("{http://www.w3.org/2000/svg}tspan"))
-            if len(tspans) >= 2:
-                title_elem = text_el
+    # --- 替换期号水印（ID → 样式 fallback） ---
+    watermark = _find_by_id(root, "episode-watermark")
+    if watermark is None:
+        for t in root.iter(TAG_TEXT):
+            fs = t.get("font-size", "")
+            if fs and int(fs) >= 400:
+                watermark = t
                 break
+    if watermark is not None:
+        watermark.text = str(number)
 
-    if title_elem is not None:
-        old_tspans = list(title_elem.iter("{http://www.w3.org/2000/svg}tspan"))
-        # 记住第一个 tspan 的属性作为模板
-        first_tspan_attribs = dict(old_tspans[0].attrib) if old_tspans else {}
-        # 找强调色（最后一个 tspan 如果有不同的 fill）
-        accent_color = None
-        if old_tspans:
-            last = old_tspans[-1]
-            if last.get("fill") and last.get("fill") != title_elem.get("fill"):
-                accent_color = last.get("fill")
+    # --- 替换主标题（ID → 样式 fallback） ---
+    title_elem = _find_by_id(root, "main-title")
+    if title_elem is None:
+        title_elem = _find_title_by_style(root)
+    if title_elem is not None and title_lines:
+        _replace_title(title_elem, title_lines)
 
-        # 清空旧 tspan
-        for ts in old_tspans:
-            title_elem.remove(ts)
-        title_elem.text = None
+    # --- 替换副标题（ID → 样式 fallback） ---
+    if subtitle_lines:
+        sub_elem = _find_by_id(root, "subtitle")
+        if sub_elem is None:
+            sub_elem = _find_subtitle_by_style(root)
+        if sub_elem is not None:
+            _replace_subtitle(sub_elem, subtitle_lines)
 
-        # 生成新 tspan
-        font_size = first_tspan_attribs.get("font-size", "96")
-        x_val = first_tspan_attribs.get("x", "80")
-        dy_val = first_tspan_attribs.get("dy", "0")
-        # 计算行间距（从第二个 tspan 的 dy 获取）
-        line_dy = "120"
-        if len(old_tspans) >= 2:
-            d = old_tspans[1].get("dy", "120")
-            if d != "0":
-                line_dy = d
+    # --- 替换底部左角标（ID → 内容 fallback） ---
+    footer_text = f"{cfg['footer_prefix']}{number}"
+    fl = _find_by_id(root, "footer-left")
+    if fl is None:
+        fl = _find_text_by_content(root, cfg["footer_prefix"])
+    if fl is not None:
+        fl.text = footer_text
 
-        for i, line in enumerate(title_lines):
-            ts = ET.SubElement(title_elem, "{http://www.w3.org/2000/svg}tspan")
-            ts.set("font-size", font_size)
-            ts.set("x", x_val)
-            ts.set("dy", "0" if i == 0 else line_dy)
-            # 最后一行用强调色
-            if i == len(title_lines) - 1 and accent_color:
-                ts.set("fill", accent_color)
-            ts.text = line
-
-    # 找副标题 <text> 块（opacity="0.35" 的文字块）
-    subtitle_elem = None
-    for text_el in root.iter("{http://www.w3.org/2000/svg}text"):
-        if text_el.get("opacity") == "0.35" and text_el.get("font-size"):
-            tspans = list(text_el.iter("{http://www.w3.org/2000/svg}tspan"))
-            if tspans:
-                subtitle_elem = text_el
-                break
-
-    if subtitle_elem is not None and subtitle_lines:
-        old_tspans = list(subtitle_elem.iter("{http://www.w3.org/2000/svg}tspan"))
-        first_attribs = dict(old_tspans[0].attrib) if old_tspans else {}
-        x_val = first_attribs.get("x", "80")
-
-        for ts in old_tspans:
-            subtitle_elem.remove(ts)
-        subtitle_elem.text = None
-
-        for i, line in enumerate(subtitle_lines):
-            ts = ET.SubElement(subtitle_elem, "{http://www.w3.org/2000/svg}tspan")
-            ts.set("x", x_val)
-            ts.set("dy", "0" if i == 0 else "40")
-            ts.text = line
-
-    # 替换产品信息行（letter-spacing="2" 的那行）
+    # --- 替换底部右归属（ID → 内容 fallback） ---
     if info_text:
-        for text_el in root.iter("{http://www.w3.org/2000/svg}text"):
-            ls = text_el.get("letter-spacing")
-            fs = text_el.get("font-size")
-            if ls == "2" and fs in ("24", "22"):
-                text_el.text = info_text
-                break
+        fr = _find_by_id(root, "footer-right")
+        if fr is None:
+            fr = _find_text_by_content(root, "Podcast")
+        if fr is not None:
+            fr.text = info_text
 
-    # 替换归属行中的品牌名（如果有 brand_override）
+    # --- 替换品牌名 ---
     if brand_override:
-        for text_el in root.iter("{http://www.w3.org/2000/svg}text"):
-            if text_el.text and "— " in text_el.text:
-                text_el.text = f"— {brand_override}"
-                break
+        sl = _find_by_id(root, "series-label")
+        if sl is not None:
+            sl.text = brand_override
 
     # 输出 SVG
     final_svg = ET.tostring(root, encoding="unicode", xml_declaration=False)
-    # 补上 xmlns（ET 有时会丢）
     if 'xmlns="http://www.w3.org/2000/svg"' not in final_svg:
-        final_svg = final_svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1)
+        final_svg = final_svg.replace("<svg ", f'<svg xmlns="{SVG_NS}" ', 1)
 
-    # 渲染 PNG
     try:
         import cairosvg
     except ImportError:
         print("错误：需要 cairosvg，运行 pip install cairosvg")
         raise SystemExit(1)
 
+    scale = 2
     cairosvg.svg2png(
         bytestring=final_svg.encode("utf-8"),
         write_to=output_path,
-        output_width=1080,
-        output_height=1350,
+        output_width=1080 * scale,
+        output_height=1350 * scale,
     )
     print(f"封面已生成：{output_path}")
 
@@ -203,7 +233,7 @@ def main():
     parser.add_argument("--subtitle", nargs="+", default=None,
                         help="副标题行")
     parser.add_argument("--info", default=None,
-                        help="产品信息（如 '教师备课资料包 · 9.9元'）")
+                        help="归属信息（如 'All In Podcast · E270'）")
     parser.add_argument("--number", required=True,
                         help="期号（如 012、270）")
     parser.add_argument("--brand", default=None,
