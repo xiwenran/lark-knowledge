@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <linearGradient id="darkBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A1A1A"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 深色背景 -->
+  <rect width="1080" height="1350" fill="url(#darkBg)"/>
+
+  <!-- 页面标题（极大，白色） -->
+  <text id="page-title" x="70" y="140" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="80" font-weight="900" fill="#FFFFFF" letter-spacing="2">完整资料预览</text>
+
+  <!-- 副标题色条（深红底 + 白字） -->
+  <rect x="0" y="175" width="1080" height="64" fill="#8B1A1A"/>
+  <text id="highlight-quote" x="70" y="217" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" letter-spacing="1">
+    <tspan x="70" dy="0">中英对照逐字稿 + 五维深度分析，全部整理好了。</tspan>
+  </text>
+
+  <!-- 2×3 网格卡片区域 -->
+
+  <!-- 卡片 1 -->
+  <rect x="70" y="310" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="110" y="370" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❶</text>
+  <text x="145" y="372" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">完整中英对照</text>
+  <text x="145" y="415" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">逐字稿全文翻译</text>
+  <text x="145" y="445" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">中文/英文逐段对照</text>
+
+  <!-- 卡片 2 -->
+  <rect x="560" y="310" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="600" y="370" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❷</text>
+  <text x="635" y="372" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">五维深度分析</text>
+  <text x="635" y="415" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">议题·市场·技术</text>
+  <text x="635" y="445" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">立场·国内映射</text>
+
+  <!-- 卡片 3 -->
+  <rect x="70" y="510" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="110" y="570" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❸</text>
+  <text x="145" y="572" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">精华金句双语</text>
+  <text x="145" y="615" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">每期 8-12 句核心观点</text>
+  <text x="145" y="645" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">中英对照 · 可截图分享</text>
+
+  <!-- 卡片 4 -->
+  <rect x="560" y="510" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="600" y="570" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❹</text>
+  <text x="635" y="572" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">嘉宾立场图谱</text>
+  <text x="635" y="615" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">四位嘉宾逐人拆解</text>
+  <text x="635" y="645" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">观点 · 论据 · 分歧点</text>
+
+  <!-- 卡片 5 -->
+  <rect x="70" y="710" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="110" y="770" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❺</text>
+  <text x="145" y="772" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">国内市场对标</text>
+  <text x="145" y="815" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">硅谷趋势 × 中国落地</text>
+  <text x="145" y="845" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">每期附国内对标分析</text>
+
+  <!-- 卡片 6 -->
+  <rect x="560" y="710" width="450" height="160" rx="12" fill="#2A2A2A"/>
+  <text x="600" y="770" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="700" fill="#C0392B">❻</text>
+  <text x="635" y="772" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF">持续更新</text>
+  <text x="635" y="815" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">每期跟进 · 200+期存量</text>
+  <text x="635" y="845" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#999999">从英文原版出发</text>
+
+  <!-- 底部说明区 -->
+  <text x="540" y="980" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="26" font-weight="400" fill="#888888" text-anchor="middle">觉得有用先收着，完整资料评论区置顶</text>
+
+  <!-- 底部 CTA 条 -->
+  <rect x="0" y="1250" width="1080" height="100" fill="#8B1A1A"/>
+  <text x="540" y="1295" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="500" fill="#FFFFFF" text-anchor="middle" letter-spacing="3" opacity="0.9">硅谷一线视角 · 中文深度解读 · 200+期结构化整理</text>
+
+  <text id="footer-left" x="70" y="1240" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#555555" letter-spacing="2">All In Podcast E270 · 中文知识库</text>
+  <text id="footer-right" x="1010" y="1218" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="18" font-weight="700" fill="#555555" text-anchor="end">5</text>
+</svg>

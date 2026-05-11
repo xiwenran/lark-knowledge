@@ -22,6 +22,7 @@
 import argparse
 import os
 import re
+import sys
 import xml.etree.ElementTree as ET
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +38,23 @@ TEMPLATES = {
     },
     "allin": {
         "svg": os.path.join(SCRIPT_DIR, "allin.svg"),
+        "brand": "ALL IN PODCAST",
+        "footer_prefix": "ALL IN · VOL.",
+    },
+}
+
+INNER_TEMPLATES = {
+    "allin": {
+        "svg": os.path.join(SCRIPT_DIR, "allin_inner_v2.svg"),
+    },
+    "allin_dark": {
+        "svg": os.path.join(SCRIPT_DIR, "allin_inner_dark.svg"),
+    },
+}
+
+COVER_TEMPLATES = {
+    "allin": {
+        "svg": os.path.join(SCRIPT_DIR, "allin_cover_v2.svg"),
         "brand": "ALL IN PODCAST",
         "footer_prefix": "ALL IN · VOL.",
     },
@@ -144,10 +162,152 @@ def _replace_subtitle(subtitle_elem, subtitle_lines):
         ts.text = line
 
 
+def _replace_body(body_elem, lines):
+    """替换正文段落 tspan，保留首行样式。"""
+    old_tspans = list(body_elem.iter(TAG_TSPAN))
+    if not old_tspans:
+        return
+
+    first_attribs = dict(old_tspans[0].attrib)
+    x_val = first_attribs.get("x", "80")
+    line_dy = "50"
+    if len(old_tspans) >= 2:
+        d = old_tspans[1].get("dy", "50")
+        if d != "0":
+            line_dy = d
+
+    # 检测是否有特殊样式行（如加粗首行、红色引用行）
+    special_lines = {}
+    for ts in old_tspans:
+        if ts.get("font-weight") and ts.get("font-weight") != body_elem.get("font-weight", ""):
+            special_lines["bold"] = {
+                "font-weight": ts.get("font-weight"),
+                "fill": ts.get("fill", ""),
+                "font-size": ts.get("font-size", ""),
+            }
+        if ts.get("fill") and ts.get("fill") != body_elem.get("fill", "#333333"):
+            if "accent" not in special_lines:
+                special_lines["accent"] = ts.get("fill")
+
+    for ts in old_tspans:
+        body_elem.remove(ts)
+    body_elem.text = None
+
+    base_font_size = first_attribs.get("font-size", "32")
+
+    for i, line in enumerate(lines):
+        ts = ET.SubElement(body_elem, TAG_TSPAN)
+        ts.set("font-size", base_font_size)
+        ts.set("x", x_val)
+        ts.set("dy", "0" if i == 0 else line_dy)
+
+        if line.startswith("!"):
+            line = line[1:]
+            ts.set("font-weight", "700")
+            ts.set("fill", "#1A1A1A")
+        elif line.startswith(">"):
+            line = line[1:]
+            accent = special_lines.get("accent", "#C0392B")
+            ts.set("fill", accent)
+            ts.set("font-size", str(int(base_font_size) + 4) if base_font_size.isdigit() else base_font_size)
+        ts.text = line
+
+
+def generate_inner_page(template_name, page_title, highlight_lines,
+                        body_sections, page_number, info_text,
+                        output_path):
+    """生成内页 PNG。
+
+    Args:
+        template_name: 模板类型（如 "allin"）
+        page_title: 页面标题
+        highlight_lines: 红色核心金句行列表
+        body_sections: 正文段落列表，每个元素是一个行列表
+                       行首 "!" 表示加粗，">" 表示红色强调
+        page_number: 页码
+        info_text: 底部信息文本
+        output_path: 输出路径
+    """
+    cfg = INNER_TEMPLATES[template_name]
+
+    with open(cfg["svg"], "r", encoding="utf-8") as f:
+        svg_content = f.read()
+
+    ET.register_namespace("", SVG_NS)
+    root = ET.fromstring(svg_content)
+
+    # 替换页面标题
+    title_el = _find_by_id(root, "page-title")
+    if title_el is not None:
+        title_el.text = page_title
+
+    # 替换核心金句
+    quote_el = _find_by_id(root, "highlight-quote")
+    if quote_el is not None and highlight_lines:
+        old_tspans = list(quote_el.iter(TAG_TSPAN))
+        first_attribs = dict(old_tspans[0].attrib) if old_tspans else {}
+        x_val = first_attribs.get("x", "80")
+        font_size = first_attribs.get("font-size", "38")
+        line_dy = "54"
+        if len(old_tspans) >= 2:
+            d = old_tspans[1].get("dy", "54")
+            if d != "0":
+                line_dy = d
+
+        for ts in old_tspans:
+            quote_el.remove(ts)
+        quote_el.text = None
+
+        for i, line in enumerate(highlight_lines):
+            ts = ET.SubElement(quote_el, TAG_TSPAN)
+            ts.set("font-size", font_size)
+            ts.set("x", x_val)
+            ts.set("dy", "0" if i == 0 else line_dy)
+            ts.text = line
+
+    # 替换正文段落 body-1 到 body-N
+    for idx, section_lines in enumerate(body_sections):
+        body_el = _find_by_id(root, f"body-{idx + 1}")
+        if body_el is not None:
+            _replace_body(body_el, section_lines)
+
+    # 替换底部信息
+    if info_text:
+        fl = _find_by_id(root, "footer-left")
+        if fl is not None:
+            fl.text = info_text
+
+    # 替换页码
+    fr = _find_by_id(root, "footer-right")
+    if fr is not None:
+        fr.text = str(page_number)
+
+    # 输出 PNG
+    final_svg = ET.tostring(root, encoding="unicode", xml_declaration=False)
+    if 'xmlns="http://www.w3.org/2000/svg"' not in final_svg:
+        final_svg = final_svg.replace("<svg ", f'<svg xmlns="{SVG_NS}" ', 1)
+
+    try:
+        import cairosvg
+    except ImportError:
+        print("错误：需要 cairosvg，运行 pip install cairosvg")
+        raise SystemExit(1)
+
+    scale = 2
+    cairosvg.svg2png(
+        bytestring=final_svg.encode("utf-8"),
+        write_to=output_path,
+        output_width=1080 * scale,
+        output_height=1350 * scale,
+    )
+    print(f"内页已生成：{output_path}")
+
+
 def generate_cover(template_name, title_lines, subtitle_lines, info_text,
-                   number, output_path, brand_override=None):
+                   number, output_path, brand_override=None,
+                   image_path=None):
     """生成封面 PNG。"""
-    cfg = TEMPLATES[template_name]
+    cfg = COVER_TEMPLATES.get(template_name) or TEMPLATES[template_name]
 
     with open(cfg["svg"], "r", encoding="utf-8") as f:
         svg_content = f.read()
@@ -203,7 +363,23 @@ def generate_cover(template_name, title_lines, subtitle_lines, info_text,
         if sl is not None:
             sl.text = brand_override
 
+    # --- 嵌入配图（base64 data URI） ---
+    if image_path:
+        img_el = _find_by_id(root, "cover-image")
+        if img_el is not None and os.path.isfile(image_path):
+            import base64
+            import mimetypes
+            mime, _ = mimetypes.guess_type(image_path)
+            if not mime:
+                mime = "image/png"
+            with open(image_path, "rb") as img_f:
+                b64 = base64.b64encode(img_f.read()).decode("ascii")
+            xlink_ns = "http://www.w3.org/1999/xlink"
+            img_el.set(f"{{{xlink_ns}}}href", f"data:{mime};base64,{b64}")
+            img_el.set("href", f"data:{mime};base64,{b64}")
+
     # 输出 SVG
+    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
     final_svg = ET.tostring(root, encoding="unicode", xml_declaration=False)
     if 'xmlns="http://www.w3.org/2000/svg"' not in final_svg:
         final_svg = final_svg.replace("<svg ", f'<svg xmlns="{SVG_NS}" ', 1)
@@ -225,34 +401,91 @@ def generate_cover(template_name, title_lines, subtitle_lines, info_text,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="生成小红书封面 PNG")
-    parser.add_argument("template", choices=["breakdown", "allin"],
-                        help="模板类型")
-    parser.add_argument("--title", nargs="+", required=True,
-                        help="标题行（最后一行自动高亮）")
-    parser.add_argument("--subtitle", nargs="+", default=None,
-                        help="副标题行")
-    parser.add_argument("--info", default=None,
-                        help="归属信息（如 'All In Podcast · E270'）")
-    parser.add_argument("--number", required=True,
-                        help="期号（如 012、270）")
-    parser.add_argument("--brand", default=None,
-                        help="品牌名覆盖")
-    parser.add_argument("-o", "--output", default=None,
-                        help="输出路径（默认 cover_{template}.png）")
+    parser = argparse.ArgumentParser(description="生成小红书封面/内页 PNG")
+    sub = parser.add_subparsers(dest="command", help="子命令")
+
+    # 封面子命令
+    cover_p = sub.add_parser("cover", help="生成封面")
+    cover_p.add_argument("template", choices=["breakdown", "allin"])
+    cover_p.add_argument("--title", nargs="+", required=True,
+                         help="标题行（最后一行自动高亮）")
+    cover_p.add_argument("--subtitle", nargs="+", default=None)
+    cover_p.add_argument("--info", default=None)
+    cover_p.add_argument("--number", required=True)
+    cover_p.add_argument("--brand", default=None)
+    cover_p.add_argument("--image", default=None,
+                         help="右下角配图路径（JPG/PNG）")
+    cover_p.add_argument("-o", "--output", default=None)
+
+    # 内页子命令
+    inner_p = sub.add_parser("inner", help="生成内页")
+    inner_p.add_argument("template", choices=["allin"])
+    inner_p.add_argument("--page-title", required=True)
+    inner_p.add_argument("--highlight", nargs="+", required=True,
+                         help="红色核心金句行")
+    inner_p.add_argument("--body", action="append", nargs="+",
+                         help="正文段落（可多次指定，每次一个段落的多行）")
+    inner_p.add_argument("--page-number", type=int, default=2)
+    inner_p.add_argument("--info", default=None)
+    inner_p.add_argument("-o", "--output", default=None)
+
+    # 兼容旧用法：直接 `generate.py allin --title ...`
     args = parser.parse_args()
 
-    output = args.output or f"cover_{args.template}.png"
-
-    generate_cover(
-        template_name=args.template,
-        title_lines=args.title,
-        subtitle_lines=args.subtitle,
-        info_text=args.info,
-        number=args.number,
-        output_path=output,
-        brand_override=args.brand,
-    )
+    if args.command == "inner":
+        output = args.output or f"inner_{args.template}_p{args.page_number}.png"
+        # CLI 模式下 `|` 分隔符展开为多行（方便手动测试）
+        body = []
+        for section in (args.body or []):
+            expanded = []
+            for item in section:
+                expanded.extend(item.split('|'))
+            body.append(expanded)
+        generate_inner_page(
+            template_name=args.template,
+            page_title=args.page_title,
+            highlight_lines=args.highlight,
+            body_sections=body,
+            page_number=args.page_number,
+            info_text=args.info,
+            output_path=output,
+        )
+    elif args.command == "cover":
+        output = args.output or f"cover_{args.template}.png"
+        generate_cover(
+            template_name=args.template,
+            title_lines=args.title,
+            subtitle_lines=args.subtitle,
+            info_text=args.info,
+            number=args.number,
+            output_path=output,
+            brand_override=args.brand,
+            image_path=args.image,
+        )
+    else:
+        # 兼容旧用法: generate.py allin --title ...
+        if len(sys.argv) > 1 and sys.argv[1] in TEMPLATES:
+            old_p = argparse.ArgumentParser()
+            old_p.add_argument("template", choices=list(TEMPLATES.keys()))
+            old_p.add_argument("--title", nargs="+", required=True)
+            old_p.add_argument("--subtitle", nargs="+", default=None)
+            old_p.add_argument("--info", default=None)
+            old_p.add_argument("--number", required=True)
+            old_p.add_argument("--brand", default=None)
+            old_p.add_argument("-o", "--output", default=None)
+            old_args = old_p.parse_args()
+            output = old_args.output or f"cover_{old_args.template}.png"
+            generate_cover(
+                template_name=old_args.template,
+                title_lines=old_args.title,
+                subtitle_lines=old_args.subtitle,
+                info_text=old_args.info,
+                number=old_args.number,
+                output_path=output,
+                brand_override=old_args.brand,
+            )
+        else:
+            parser.print_help()
 
 
 if __name__ == "__main__":

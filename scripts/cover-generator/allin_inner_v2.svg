@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <linearGradient id="subtleWarm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5F0E8"/>
+      <stop offset="100%" stop-color="#F0EBE1"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1080" height="1350" fill="url(#subtleWarm)"/>
+  <rect width="1080" height="1350" filter="url(#grain)" opacity="0.02"/>
+
+  <!-- 页面标题 -->
+  <text id="page-title" x="55" y="130" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="76" font-weight="900" fill="#1A1A1A" letter-spacing="2">本期最反直觉的判断</text>
+
+  <!-- 副标题色条 -->
+  <rect x="0" y="165" width="1080" height="64" fill="#8B1A1A"/>
+  <text id="highlight-quote" x="55" y="207" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="28" font-weight="700" fill="#FFFFFF" letter-spacing="1">
+    <tspan x="55" dy="0">基础设施过剩的时候，恰好是护城河最宽的时候。</tspan>
+  </text>
+
+  <!-- 正文段落 1 -->
+  <text id="body-1" x="55" y="310" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="30" font-weight="400" fill="#333333">
+    <tspan x="55" dy="0">三大云厂商去年砸了2600亿美金搞算力，</tspan>
+    <tspan x="55" dy="48">但AI应用收入增速才40%。所有人第一</tspan>
+    <tspan x="55" dy="48">反应：这不就是泡沫吗？</tspan>
+  </text>
+
+  <!-- 分隔线 -->
+  <line x1="55" y1="440" x2="280" y2="440" stroke="#C0392B" stroke-width="2" opacity="0.3"/>
+
+  <!-- 正文段落 2 -->
+  <text id="body-2" x="55" y="495" font-family="PingFang SC, Noto Sans SC, sans-serif" fill="#1A1A1A">
+    <tspan font-size="30" font-weight="700" x="55" dy="0">但他们说了一句话让我重新想了很久——</tspan>
+    <tspan font-size="34" font-weight="700" x="55" dy="58" fill="#C0392B">"基础设施过剩的时候，恰好是护城河最宽的时候。"</tspan>
+  </text>
+
+  <!-- 分隔线 -->
+  <line x1="55" y1="620" x2="280" y2="620" stroke="#C0392B" stroke-width="2" opacity="0.3"/>
+
+  <!-- 正文段落 3 -->
+  <text id="body-3" x="55" y="675" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="30" font-weight="400" fill="#333333">
+    <tspan x="55" dy="0">想想90年代铺光纤，当时也是所有人喊</tspan>
+    <tspan x="55" dy="48">泡沫，结果活下来那批公司后来垄断了整</tspan>
+    <tspan x="55" dy="48">个云计算。今天的算力军备竞赛，可能正</tspan>
+    <tspan x="55" dy="48">在重复这件事。</tspan>
+  </text>
+
+  <!-- 分隔线 -->
+  <line x1="55" y1="820" x2="280" y2="820" stroke="#C0392B" stroke-width="2" opacity="0.3"/>
+
+  <!-- 正文段落 4 -->
+  <text id="body-4" x="55" y="875" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="30" font-weight="400" fill="#333333">
+    <tspan x="55" dy="0" font-weight="700" fill="#1A1A1A">对你意味着什么：</tspan>
+    <tspan x="55" dy="48">如果你在创业，别只看"做什么应用"，</tspan>
+    <tspan x="55" dy="48">想想"谁控制了你的算力成本"——那才</tspan>
+    <tspan x="55" dy="48">是真正的上游。</tspan>
+  </text>
+
+  <!-- 底部 CTA 条 -->
+  <rect x="0" y="1250" width="1080" height="100" fill="#8B1A1A"/>
+  <text x="540" y="1295" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="500" fill="#FFFFFF" text-anchor="middle" letter-spacing="3" opacity="0.9">硅谷一线视角 · 中文深度解读 · 200+期结构化整理</text>
+
+  <text id="footer-left" x="55" y="1235" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#AAAAAA" letter-spacing="2">All In Podcast E270 · 中文知识库</text>
+  <text id="footer-right" x="1025" y="1235" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="18" font-weight="700" fill="#999999" text-anchor="end">2</text>
+</svg>

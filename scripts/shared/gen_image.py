@@ -207,7 +207,7 @@ def _analysis_text(analysis: dict[str, Any]) -> str:
 def build_product_breakdown_prompts(
     record: dict[str, Any], analysis: dict[str, Any] | None = None
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    """构建商品拆解 4 张图的 V2 prompt。"""
+    """构建商品拆解 5 张图的 V2 prompt。"""
     record = normalize_record(record)
     analysis = analysis or {}
     findings: list[dict[str, str]] = []
@@ -568,13 +568,13 @@ def main() -> None:
             except Exception as exc:
                 page_num, title, result, elapsed = page["page_num"], page["title"], None, 0.0
                 print(f"error: 第 {page_num} 张异常（{exc}）")
-            print(f"[完成] {completed}/4 — {title} (耗时 {elapsed:.0f}s)")
+            print(f"[完成] {completed}/{len(pages)} — {title} (耗时 {elapsed:.0f}s)")
             if result:
                 generated_by_page[page_num] = result
 
     generated = [generated_by_page[page["page_num"]] for page in pages if page["page_num"] in generated_by_page]
 
-    print(f"\n完成：{len(generated)}/4 张 -> {output_dir}")
+    print(f"\n完成：{len(generated)}/{len(pages)} 张 -> {output_dir}")
     for path in generated:
         print(f"  {path}")
     if findings:

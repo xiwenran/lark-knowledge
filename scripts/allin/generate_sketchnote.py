@@ -344,7 +344,7 @@ def format_points(points: list[dict]) -> str:
 
 
 def build_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
-    """提取 inner_v2 模板填空参数。page_index: 0=核心议题, 1=市场判断, 2=四人立场, 3=国内启示。"""
+    """提取 inner_v2 模板填空参数（旧版 gpt-image-2 模式，保留兼容）。"""
     five_dim_raw = analysis.get('five_dim', '')
     quotes_text = analysis.get('quotes', '')
     dim1 = extract_dim(five_dim_raw, '①')
@@ -391,9 +391,6 @@ def build_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
     spec = page_specs[page_index]
 
     if page_index == 2 and dim4:
-        # 四人立场页必须 4 个 points（每个主播一块），不能合并 Jason+Chamath。
-        # 旧版合并成 3 个 points 时，AI 看到"四人立场"+4 主播名字会自己画 4 块，
-        # 没第 4 个 point 就复制 Sacks，导致 Sacks 在画面里重复出现。
         fallback = extract_bullets(dim4, 1)[0]
         stances = {
             name: extract_stance(dim4, name) or fallback
@@ -428,26 +425,355 @@ def render_inner_from_params(params: dict) -> str:
     return poster_template.render_inner_prompt(render_params)
 
 
-def build_page_prompts(record: dict, analysis: dict) -> list:
-    """生成 1 张 cover_v2 + 4 张 inner_v2 的 V2 海报提示词。"""
-    cover_params = build_cover_params(record, analysis)
-    cover_render_params = dict(cover_params)
+# ── SVG 内页参数构建（认知驱动结构）──────────────────────────────
+
+def _strip_tags(text: str) -> str:
+    """去除飞书富文本标签 <text color="...">...</text>。"""
+    return re.sub(r'</?text[^>]*>', '', text)
+
+
+def _char_width(ch: str) -> float:
+    """估算单个字符在 font-size=30 PingFang SC 下的渲染宽度（SVG px）。
+    数值来自 cairosvg 实际渲染测量。
+    """
+    if ch in '""''':
+        return 13.0
+    if ch in '，。、；：！？':
+        return 28.0
+    if ch in '…——–—':
+        return 30.0
+    if ch in '「」『』【】（）':
+        return 28.0
+    if '一' <= ch <= '鿿' or '㐀' <= ch <= '䶿':
+        return 29.5
+    if ch in '()[]{}':
+        return 14.0
+    if ch.isdigit():
+        return 17.5
+    if ch.isascii() and ch.isalpha():
+        if ch.isupper():
+            return 20.0
+        return 16.5
+    if ch in ' \t':
+        return 8.0
+    if ch in '.,:;!?':
+        return 10.0
+    if ch in '%':
+        return 28.0
+    if ch in '#@&$':
+        return 18.0
+    return 20.0
+
+
+def _text_width(text: str) -> float:
+    """估算一段文字的总渲染宽度（SVG px）。"""
+    return sum(_char_width(c) for c in text)
+
+
+# 左边距55 + 右边距55 = 可用宽度 970px
+_MAX_LINE_PX = 930
+
+
+def _wrap_lines(text: str, max_chars: int = 20, max_lines: int = 3) -> list[str]:
+    """按像素宽度估算折行，不拆断英文单词，限制总行数。
+    max_chars 仍保留作为硬上限兜底（防止估算偏差导致溢出）。
+    """
+    text = _strip_tags(text).strip()
+    if not text:
+        return []
+    lines = []
+    while text and len(lines) < max_lines - 1:
+        if _text_width(text) <= _MAX_LINE_PX:
+            break
+        # 逐字累加找到像素断点
+        cut = 0
+        px = 0.0
+        for i, ch in enumerate(text):
+            px += _char_width(ch)
+            if px > _MAX_LINE_PX:
+                cut = i
+                break
+        else:
+            break
+        if cut == 0:
+            cut = 1
+        # 硬上限兜底
+        if cut > max_chars:
+            cut = max_chars
+        # 不在英文单词中间切
+        if cut < len(text) and text[cut].isascii() and text[cut].isalpha():
+            saved = cut
+            while cut > 0 and text[cut - 1].isascii() and text[cut - 1].isalpha():
+                cut -= 1
+            if cut == 0:
+                cut = saved
+        # 不在中文标点前切
+        if cut < len(text) and text[cut] in '，。、；：）」』】!？…——':
+            saved = cut
+            while cut > 0 and text[cut] in '，。、；：）」』】!？…——':
+                cut -= 1
+            if cut == 0:
+                cut = saved
+        lines.append(text[:cut].rstrip())
+        text = text[cut:].lstrip()
+    if text:
+        if _text_width(text) > _MAX_LINE_PX:
+            # 截断到像素限制内
+            px = 0.0
+            for i, ch in enumerate(text):
+                px += _char_width(ch)
+                if px > _MAX_LINE_PX - 30:
+                    text = text[:i] + '…'
+                    break
+        lines.append(text)
+    return lines[:max_lines]
+
+
+def _first_sentence(text: str, max_len: int = 40, min_len: int = 10) -> str:
+    """取第一个足够长的完整句子，不超过 max_len。"""
+    for sep in ['。', '；']:
+        idx = text.find(sep)
+        if min_len <= idx <= max_len:
+            return text[:idx + 1]
+    # 句号找不到，试逗号但要求更长
+    pos = 0
+    while True:
+        idx = text.find('，', pos)
+        if idx < 0 or idx > max_len:
+            break
+        if idx >= min_len:
+            return text[:idx + 1]
+        pos = idx + 1
+    return (text[:max_len - 1] + '…') if len(text) > max_len else text
+
+
+def _parse_zh_quotes(quotes_text: str) -> list[str]:
+    """从金句 Markdown 中提取所有中文译文行，去除归属（— Speaker）。"""
+    results = []
+    for line in quotes_text.split('\n'):
+        line = line.strip()
+        if not line.startswith('>'):
+            continue
+        clean = re.sub(r'^>\s*\*?\*?', '', line).strip(' "「」*')
+        if not clean or not re.search(r'[一-鿿]', clean):
+            continue
+        # 去掉 "— Speaker Name" 及其后续内容（含括号注释如"（论 Medallia 案例）"）
+        clean = re.sub(r'\s*[—–-]+\s*[A-Za-z][\w\s]*(?:[（(].*?[）)])?.*$', '', clean).strip()
+        clean = re.sub(r'\s*[—–-]+\s*[一-鿿].*$', '', clean).strip()
+        # 去掉行尾残留的括号注释和 Markdown 格式残留
+        clean = re.sub(r'\s*[（(][^）)]*[）)]?\s*$', '', clean).strip()
+        clean = clean.strip(' "\"「」*')
+        if clean:
+            results.append(clean)
+    return results
+
+
+def build_svg_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
+    """为 SVG 内页模板构建参数。认知驱动结构：
+    0=最反直觉的判断, 1=嘉宾最激烈的分歧, 2=说回咱们, 3=完整资料预览。
+
+    每个 body section 严格限制 3 行 × 20字，匹配 SVG 模板固定布局。
+    """
+    five_dim_raw = analysis.get('five_dim', '')
+    quotes_text = analysis.get('quotes', '')
+    dim1 = _strip_tags(extract_dim(five_dim_raw, '①'))
+    dim2 = _strip_tags(extract_dim(five_dim_raw, '②'))
+    dim3 = _strip_tags(extract_dim(five_dim_raw, '③'))
+    dim4 = _strip_tags(extract_dim(five_dim_raw, '④'))
+    dim5 = _strip_tags(extract_dim(five_dim_raw, '⑤'))
+    episode = record.get('期号', '???')
+    zh_quotes = _parse_zh_quotes(quotes_text)
+    info = f"All In Podcast E{episode} · 中文知识库"
+
+    W = 40  # 字符数硬上限兜底；实际由 _wrap_lines 按像素宽度断行（_MAX_LINE_PX=970）
+
+    if page_index == 0:
+        # 本期最反直觉的判断
+        highlight = zh_quotes[0] if zh_quotes else _first_sentence(dim2, 40)
+        # 段1：背景
+        b1 = _wrap_lines(_first_sentence(dim1, 60), W)
+        # 段2：关键论点（用第二条金句或 dim2 的第二句，避免和 highlight 重复）
+        core = zh_quotes[1] if len(zh_quotes) > 1 else _first_sentence(dim2, 36)
+        b2 = ['!但他们说了一句让人重新想的话——'] + ['>' + l for l in _wrap_lines(core, W - 2, 2)]
+        # 段3：展开论证
+        sentences = [s.strip() for s in dim2.split('。') if s.strip()]
+        expand = sentences[1] + '。' if len(sentences) > 1 else _first_sentence(dim3, 60)
+        b3 = _wrap_lines(expand, W)
+        # 段4：对你意味什么
+        insight = _first_sentence(dim5, 50) if dim5 else '值得持续关注这个方向的变化。'
+        b4 = ['!对你意味着什么：'] + _wrap_lines(insight, W, 2)
+
+        return {
+            'page_title': '本期最反直觉的判断',
+            'highlight_lines': _wrap_lines(highlight, W - 2, 2),
+            'body_sections': [b1, b2, b3, b4],
+            'page_number': 2,
+            'info_text': info,
+        }
+
+    elif page_index == 1:
+        # 嘉宾最激烈的分歧
+        stances = {
+            name: _strip_tags(extract_stance(dim4, name) or '')
+            for name in ['Sacks', 'Chamath', 'Jason', 'Friedberg']
+        }
+        aggressive_name = 'Sacks' if stances.get('Sacks') else 'Chamath'
+        aggressive = stances.get(aggressive_name, '')
+        rebuttal_name = 'Jason' if stances.get('Jason') else 'Friedberg'
+        rebuttal = stances.get(rebuttal_name, '')
+
+        # 找中文金句作为 highlight
+        dispute_quote = ''
+        for q in zh_quotes:
+            if any(k in q for k in ['SaaS', '半', '估值', '替代', '债务', '腰斩']):
+                dispute_quote = q
+                break
+        if not dispute_quote:
+            dispute_quote = aggressive[:36] if aggressive else _first_sentence(dim3, 36)
+
+        b1 = _wrap_lines(_first_sentence(dim3, 60), W)
+        b2 = [f'!{aggressive_name}最激进：'] + ['>' + l for l in _wrap_lines(aggressive[:36] if aggressive else dim3[:30], W - 2, 2)]
+        b3 = [f'!{rebuttal_name}立刻反驳：'] + _wrap_lines(rebuttal[:40] if rebuttal else '有数据护城河的公司完全不同。', W, 2)
+        b4 = ['!对你意味着什么：'] + _wrap_lines(_first_sentence(dim5, 40) if dim5 else '留意你所在行业的替代信号。', W, 2)
+
+        return {
+            'page_title': '嘉宾最激烈的分歧',
+            'highlight_lines': _wrap_lines(dispute_quote, W - 4, 2),
+            'body_sections': [b1, b2, b3, b4],
+            'page_number': 3,
+            'info_text': info,
+        }
+
+    elif page_index == 2:
+        # 说回咱们：你现在能做什么
+        highlight_text = '大部分人关注"AI会不会取代我"——更该关注的是"我的成本结构变了没"。'
+
+        # 从 dim5 提取，但过滤掉明显无关的话题（农药、法律、医学等）
+        skip_keywords = ['氯吡', '农药', '农产品', 'SPLC', '结直肠', '癌', '起诉']
+        dim5_sentences = [s.strip() for s in dim5.split('。') if s.strip()]
+        relevant = [s for s in dim5_sentences if not any(k in s for k in skip_keywords)]
+        if not relevant:
+            relevant = dim5_sentences[:3]
+        bullets = relevant[:3] if relevant else ['关注成本结构变化', '判断行业位置', '抓住算力降价窗口']
+
+        def _action_block(label: str, text: str) -> list[str]:
+            return [f'!{label}'] + _wrap_lines(text, W, 2)
+
+        b1 = _action_block('第一件事：', _first_sentence(bullets[0], 40) if bullets else '关注成本结构变化。')
+        b2 = _action_block('第二件事：', _first_sentence(bullets[1], 40) if len(bullets) > 1 else '判断你的行业是界面层还是基础设施层。')
+        b3 = _action_block('第三件事：', _first_sentence(bullets[2], 40) if len(bullets) > 2 else '今天做不起的AI项目，一年半后成本减半。')
+        # 国内对标：从 remaining sentences（排除已用的 bullets）中找
+        used_texts = set(bullets[:3])
+        remaining = [s for s in relevant if s not in used_texts]
+        china_part = next((s for s in remaining if any(k in s for k in ['国内', '中国', '字节', '阿里', '华为', '腾讯'])), '')
+        if not china_part:
+            china_part = remaining[0] if remaining else ''
+        b4 = ['!国内对标：'] + _wrap_lines(_first_sentence(china_part, 40) if china_part else '字节豆包正在走AI+SaaS融合路线。', W, 2)
+
+        return {
+            'page_title': '说回咱们：你现在能做什么',
+            'highlight_lines': _wrap_lines(highlight_text, W - 2, 2),
+            'body_sections': [b1, b2, b3, b4],
+            'page_number': 4,
+            'info_text': info,
+        }
+
+    else:
+        # 完整资料预览
+        return {
+            'page_title': '完整资料预览',
+            'highlight_lines': ['中英对照逐字稿 + 五维深度分析', '全部整理好了，觉得有用先收着。'],
+            'body_sections': [
+                ['!本期资料包含：', '· 完整中英对照逐字稿', '· 五维深度分析'],
+                ['· 精华金句双语对照', '· 四位嘉宾立场图谱', '· 国内市场对标分析'],
+                ['!All In Podcast 中文知识库', '200+期结构化整理，持续更新中。', '每期从原版英文出发，AI辅助翻译+人工校对。'],
+                ['!获取方式：', '评论区置顶 或 私信「All In」', ''],
+            ],
+            'page_number': 5,
+            'info_text': info,
+        }
+
+
+def _split_title_for_cover(title: str, max_chars: int = 8) -> list[str]:
+    """将中文标题拆为 2-3 行，尊重英文单词边界，递归处理长段。"""
+    if len(title) <= max_chars:
+        return [title]
+    # 先在逗号/冒号处分割
+    for sep in ['，', '：', '、', '——']:
+        if sep in title:
+            parts = [p.strip() for p in title.split(sep, 1) if p.strip()]
+            result = []
+            for p in parts:
+                result.extend(_split_title_for_cover(p, max_chars))
+            return result
+    # 在中英文交界处分割（如 "收购Cursor的" vs "不是买工具"）
+    m = re.search(r'([a-zA-Z]+[的了是]?)', title)
+    if m and m.end() < len(title):
+        prefix = title[:m.end()]
+        suffix = title[m.end():]
+        if len(prefix) <= max_chars + 4 and len(suffix) <= max_chars + 4:
+            return [prefix, suffix]
+    # 强制在字数处切，但不切断英文单词
+    lines, buf = [], ''
+    for ch in title:
+        buf += ch
+        if len(buf) >= max_chars and not ch.isascii():
+            lines.append(buf)
+            buf = ''
+    if buf:
+        lines.append(buf)
+    return lines or [title]
+
+
+def build_svg_pages(record: dict, analysis: dict) -> list:
+    """构建 SVG 渲染参数列表：1 封面 + 4 内页。"""
+    cover_raw = build_cover_params(record, analysis)
+    episode = record.get('期号', '???')
+    title = record.get('中文标题', '未知标题')
+    dim1 = _strip_tags(extract_dim(analysis.get('five_dim', ''), '①'))
+
+    # 封面标题：从中文标题衍生 2-3 行
+    title_lines = _split_title_for_cover(title)
+    # 副标题：从②核心论点提取关键短句（≤18字/行，最多2行）
+    dim2 = _strip_tags(extract_dim(analysis.get('five_dim', ''), '②'))
+    sub_sentences = [s.strip() for s in re.split(r'[。；]', dim2) if s.strip() and len(s.strip()) >= 6]
+    subtitle_lines = []
+    for s in sub_sentences[:2]:
+        s = _strip_tags(s)
+        if len(s) > 18:
+            s = s[:17] + '…'
+        subtitle_lines.append(s)
+    if not subtitle_lines:
+        subtitle_lines = [title[:18]]
 
     pages = [{
         'page_num': 1,
         'title': '封面',
-        'prompt': poster_template.render_cover_prompt(cover_render_params),
+        'mode': 'cover',
+        'params': {
+            'episode': episode,
+            'title_lines': title_lines,
+            'subtitle_lines': subtitle_lines,
+            'info_text': f"All In Podcast · E{episode}",
+        },
     }]
 
-    for page_index, title in enumerate(['核心议题', '市场判断', '四人立场', '国内启示']):
-        params = build_inner_params(record, analysis, page_index)
+    titles = ['本期最反直觉的判断', '嘉宾最激烈的分歧', '说回咱们', '完整资料预览']
+    for idx in range(4):
+        inner_params = build_svg_inner_params(record, analysis, idx)
         pages.append({
-            'page_num': page_index + 2,
-            'title': title,
-            'prompt': render_inner_from_params(params),
+            'page_num': idx + 2,
+            'title': titles[idx],
+            'mode': 'inner_svg',
+            'params': inner_params,
         })
 
     return pages
+
+
+def build_page_prompts(record: dict, analysis: dict) -> list:
+    """生成 1 张 cover + 4 张 inner 的参数（SVG 模式优先，兼容旧 gpt-image-2）。"""
+    return build_svg_pages(record, analysis)
 
 
 def find_codex_companion() -> list[str] | None:
@@ -566,8 +892,58 @@ def generate_image(prompt: str, page_num: int, output_path: Path,
     return None
 
 
+def generate_svg_page(page: dict, output_dir: Path, slug: str) -> tuple[int, str, str | None, float]:
+    """用 SVG 模板渲染一页（封面或内页）。"""
+    start = time.time()
+    out = output_dir / f"allin_{slug}_sketch_{page['page_num']:02d}_{page['title']}.png"
+    cover_gen = REPO_ROOT / 'scripts' / 'cover-generator' / 'generate.py'
+    params = page['params']
+
+    env = dict(os.environ)
+    env['DYLD_LIBRARY_PATH'] = '/opt/homebrew/lib'
+
+    try:
+        if page['mode'] == 'cover':
+            cmd = [sys.executable, str(cover_gen), 'cover', 'allin',
+                   '--number', str(params.get('episode', '???')),
+                   '-o', str(out)]
+            if params.get('title_lines'):
+                cmd += ['--title'] + params['title_lines']
+            if params.get('subtitle_lines'):
+                cmd += ['--subtitle'] + params['subtitle_lines']
+            if params.get('info_text'):
+                cmd += ['--info', params['info_text']]
+            subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
+
+        elif page['mode'] == 'inner_svg':
+            cmd = [sys.executable, str(cover_gen), 'inner', 'allin',
+                   '--page-title', params['page_title'],
+                   '--page-number', str(params['page_number']),
+                   '-o', str(out)]
+            cmd += ['--highlight'] + params['highlight_lines']
+            if params.get('info_text'):
+                cmd += ['--info', params['info_text']]
+            for section in params.get('body_sections', []):
+                cmd += ['--body'] + section
+            subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
+
+    except subprocess.CalledProcessError as exc:
+        print(f"  ❌  第 {page['page_num']} 张 SVG 渲染失败：{exc.stderr or exc.stdout}")
+        return page['page_num'], page['title'], None, time.time() - start
+
+    elapsed = time.time() - start
+    if out.exists() and out.stat().st_size > MIN_IMAGE_BYTES:
+        print(f"       ✅ {out.name} ({out.stat().st_size // 1024} KB)")
+        return page['page_num'], page['title'], str(out), elapsed
+    return page['page_num'], page['title'], None, elapsed
+
+
 def generate_one_page(page: dict, total: int, output_dir: Path, slug: str,
                       api_key: str, api_base: str, model: str) -> tuple[int, str, str | None, float]:
+    """兼容分发：SVG 模式 or gpt-image-2 模式。"""
+    if page.get('mode') in ('cover', 'inner_svg'):
+        return generate_svg_page(page, output_dir, slug)
+
     start = time.time()
     out = output_dir / f"allin_{slug}_sketch_{page['page_num']:02d}_{page['title']}.png"
     img = generate_image(page['prompt'], page['page_num'], out, api_key, api_base, model)

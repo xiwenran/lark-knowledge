@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <linearGradient id="subtleWarm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5F0E8"/>
+      <stop offset="100%" stop-color="#F0EBE1"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1080" height="1350" fill="url(#subtleWarm)"/>
+  <rect width="1080" height="1350" filter="url(#grain)" opacity="0.02"/>
+
+  <!-- 右侧竖排品牌 -->
+  <text id="brand-vertical-1" x="1040" y="75" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="17" font-weight="400" fill="#AAAAAA" text-anchor="middle">
+    <tspan x="1040" dy="0">硅</tspan><tspan x="1040" dy="26">谷</tspan><tspan x="1040" dy="26">顶</tspan><tspan x="1040" dy="26">级</tspan><tspan x="1040" dy="26">V</tspan><tspan x="1040" dy="26">C</tspan>
+  </text>
+  <text id="brand-vertical-2" x="1012" y="75" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="17" font-weight="400" fill="#AAAAAA" text-anchor="middle">
+    <tspan x="1012" dy="0">中</tspan><tspan x="1012" dy="26">文</tspan><tspan x="1012" dy="26">知</tspan><tspan x="1012" dy="26">识</tspan><tspan x="1012" dy="26">库</tspan>
+  </text>
+
+  <!-- 顶部品牌行 -->
+  <text id="series-label" x="55" y="68" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="500" fill="#999999" letter-spacing="4">ALL IN PODCAST · E270</text>
+
+  <!-- 主标题 -->
+  <text id="main-title" x="50" y="230" font-family="PingFang SC, Noto Sans SC, sans-serif" font-weight="900" fill="#1A1A1A">
+    <tspan font-size="108" x="50" dy="0">算力竞赛2600亿</tspan>
+    <tspan font-size="108" x="50" dy="136">砸下去，到底在</tspan>
+    <tspan font-size="108" x="50" dy="136">赌什么？</tspan>
+  </text>
+
+  <!-- 红色副标题 -->
+  <text id="subtitle" x="55" y="690" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="48" font-weight="700" fill="#C0392B" letter-spacing="1">
+    <tspan x="55" dy="0">有个判断国内没人提，</tspan>
+    <tspan x="55" dy="72">听完我重新想了很久。</tspan>
+  </text>
+
+  <!-- 内容说明（左侧） -->
+  <text x="55" y="900" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="24" font-weight="400" fill="#555555">
+    <tspan x="55" dy="0">4位管理超500亿美金的硅谷VC，</tspan>
+    <tspan x="55" dy="38">这期聊了：</tspan>
+  </text>
+  <text x="55" y="1000" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="400" fill="#888888">
+    <tspan x="55" dy="0">· AI算力军备竞赛</tspan>
+    <tspan x="55" dy="36">· SaaS订阅制的诺基亚时刻</tspan>
+    <tspan x="55" dy="36">· 基础设施过剩悖论</tspan>
+    <tspan x="55" dy="36">· 普通人的算力成本信号</tspan>
+  </text>
+
+  <!-- ====== 右下角主题插图区（id=cover-illustration） ====== -->
+  <g id="cover-illustration" transform="translate(600, 840)">
+    <!-- 服务器机架 1 -->
+    <rect x="0" y="60" width="120" height="260" rx="8" fill="#1A1A1A"/>
+    <rect x="12" y="76" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="96" cy="85" r="4" fill="#C0392B"/>
+    <rect x="12" y="102" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="96" cy="111" r="4" fill="#4CAF50"/>
+    <rect x="12" y="128" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="96" cy="137" r="4" fill="#4CAF50"/>
+    <rect x="12" y="154" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="96" cy="163" r="4" fill="#C0392B"/>
+    <rect x="12" y="180" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="96" cy="189" r="4" fill="#4CAF50"/>
+    <rect x="12" y="220" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="12" y="234" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="12" y="248" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="12" y="262" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="12" y="276" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="12" y="290" width="96" height="6" rx="2" fill="#333333"/>
+
+    <!-- 服务器机架 2 -->
+    <rect x="140" y="20" width="120" height="300" rx="8" fill="#222222"/>
+    <rect x="152" y="36" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="45" r="4" fill="#4CAF50"/>
+    <rect x="152" y="62" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="71" r="4" fill="#4CAF50"/>
+    <rect x="152" y="88" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="97" r="4" fill="#C0392B"/>
+    <rect x="152" y="114" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="123" r="4" fill="#4CAF50"/>
+    <rect x="152" y="140" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="149" r="4" fill="#4CAF50"/>
+    <rect x="152" y="166" width="96" height="18" rx="3" fill="#333333"/>
+    <circle cx="236" cy="175" r="4" fill="#C0392B"/>
+    <rect x="152" y="200" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="214" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="228" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="242" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="256" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="270" width="96" height="6" rx="2" fill="#444444"/>
+    <rect x="152" y="284" width="96" height="6" rx="2" fill="#444444"/>
+
+    <!-- 服务器机架 3 -->
+    <rect x="280" y="80" width="120" height="240" rx="8" fill="#1A1A1A"/>
+    <rect x="292" y="96" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="376" cy="105" r="4" fill="#4CAF50"/>
+    <rect x="292" y="122" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="376" cy="131" r="4" fill="#4CAF50"/>
+    <rect x="292" y="148" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="376" cy="157" r="4" fill="#C0392B"/>
+    <rect x="292" y="174" width="96" height="18" rx="3" fill="#2A2A2A"/>
+    <circle cx="376" cy="183" r="4" fill="#4CAF50"/>
+    <rect x="292" y="210" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="292" y="224" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="292" y="238" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="292" y="252" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="292" y="266" width="96" height="6" rx="2" fill="#333333"/>
+    <rect x="292" y="280" width="96" height="6" rx="2" fill="#333333"/>
+
+    <!-- 美元符号（浮在服务器上方） -->
+    <text x="60" y="40" font-family="PingFang SC, sans-serif" font-size="42" font-weight="900" fill="#C0392B" opacity="0.7">$</text>
+    <text x="200" y="8" font-family="PingFang SC, sans-serif" font-size="36" font-weight="900" fill="#C0392B" opacity="0.5">$</text>
+    <text x="340" y="60" font-family="PingFang SC, sans-serif" font-size="30" font-weight="900" fill="#C0392B" opacity="0.4">$</text>
+
+    <!-- 上升箭头（表示增长/竞赛） -->
+    <polygon points="180,-20 168,0 175,0 175,16 185,16 185,0 192,0" fill="#C0392B" opacity="0.6"/>
+    <polygon points="320,30 308,50 315,50 315,66 325,66 325,50 332,50" fill="#C0392B" opacity="0.4"/>
+  </g>
+
+  <!-- 底部分隔线 -->
+  <line x1="55" y1="1190" x2="1025" y2="1190" stroke="#C0392B" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- 底部信息 -->
+  <text id="footer-left" x="55" y="1230" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="16" font-weight="700" fill="#999999" letter-spacing="3">ALL IN · VOL.270</text>
+  <text id="footer-right" x="1025" y="1230" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="16" font-weight="400" fill="#999999" letter-spacing="2" text-anchor="end">All In Podcast · E270</text>
+
+  <!-- 底部 CTA 条 -->
+  <rect x="0" y="1260" width="1080" height="90" fill="#8B1A1A"/>
+  <text x="540" y="1312" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="22" font-weight="500" fill="#FFFFFF" text-anchor="middle" letter-spacing="3" opacity="0.9">硅谷一线视角 · 中文深度解读 · 200+期结构化整理</text>
+</svg>
