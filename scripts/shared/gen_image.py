@@ -2,8 +2,8 @@
 """
 gen_image.py — 商品拆解笔记图片生成 CLI
 
-默认生成 4 张小红书商品拆解图：
-  1 封面 + 3 内容图（商业模式拆解 / 流量拆解 / 机会拆解）。
+默认生成 5 张小红书商品拆解图：
+  1 封面（SVG模板） + 3 内容图（核心卖点洞察 / 流量认知差 / 可复用经验） + 1 资料预览。
 
 也保留单 prompt 生图兼容入口：
   python3 scripts/shared/gen_image.py --prompt "..." --output /tmp/sketch.png
@@ -266,69 +266,90 @@ def build_product_breakdown_prompts(
         {"page_num": 1, "title": "封面", "core_keyword": cover_core, "prompt": cover_prompt},
         {
             "page_num": 2,
-            "title": "商业模式拆解",
+            "title": "核心卖点洞察",
             "core_keyword": business_core,
             "prompt": _productize_prompt(
                 render_inner_prompt(
                 {
-                    "page_title": "商业模式拆解",
+                    "page_title": "核心卖点洞察",
                     "core_keyword": business_core,
-                    "page_subtitle": f"{product_name} 的产品形态、定价与赛道位置",
+                    "page_subtitle": f"{product_name} 真正卖的是什么？",
                     "cross_page_motif_hint": (
-                        "视觉母题建议用商业引擎、齿轮组合、价格标签和交付盒子的剪纸结构。"
+                        "视觉母题建议用价格标签、时钟（省时间）、阶梯定价的剪纸结构。"
                         f"\n隐喻预设参考：{business_metaphors}"
                     ),
                     "points": _format_points(
                         extract_bullets(dim1 + "\n" + dim3, 3)
-                        or [f"产品形态：{category}", f"定价观察：{price}", "成本结构：从交付方式与内容密度推算"]
+                        or [f"反常识洞察：{category}卖的不是内容，是省下的时间", f"定价逻辑：{price}不是终点价，是进门价", "对你的启发：问自己——我卖的到底是内容还是效率？"]
                     ),
-                    "aux_poetry": "一个商品，是一台被流量推动的商业引擎。",
+                    "aux_poetry": "买家花的不是钱，是对省下时间的信任。",
                 }
                 )
             ),
         },
         {
             "page_num": 3,
-            "title": "流量拆解",
+            "title": "流量认知差",
             "core_keyword": traffic_core,
             "prompt": _productize_prompt(
                 render_inner_prompt(
                 {
-                    "page_title": "流量拆解",
+                    "page_title": "流量认知差",
                     "core_keyword": traffic_core,
-                    "page_subtitle": f"从「{traffic_entry}」看转化链路",
+                    "page_subtitle": f"从「{traffic_entry}」看被低估的获客方式",
                     "cross_page_motif_hint": (
-                        "视觉母题建议用漏斗、转化链路、手绘箭头和节点标记贯穿全页。"
+                        "视觉母题建议用搜索框vs推荐流、转化率对比、手绘箭头贯穿全页。"
                         f"\n隐喻预设参考：{traffic_metaphors}"
                     ),
                     "points": _format_points(
                         extract_bullets(dim2, 3)
-                        or [f"入口：{traffic_entry}", "路径：内容曝光 -> 私信/店铺 -> 下单", f"结果：{sales}"]
+                        or [f"反常识洞察：搜索流量转化率比推荐流量高3-5倍", f"入口：{traffic_entry}", "对你的启发：你现在的获客方式是搜索还是推荐？"]
                     ),
-                    "aux_poetry": "流量不是水流，而是一串可复盘的转化节点。",
+                    "aux_poetry": "主动搜你的人，才是最容易成交的客户。",
                 }
                 )
             ),
         },
         {
             "page_num": 4,
-            "title": "机会拆解",
+            "title": "可复用经验",
             "core_keyword": opportunity_core,
             "prompt": _productize_prompt(
                 render_inner_prompt(
                 {
-                    "page_title": "机会拆解",
+                    "page_title": "可复用经验",
                     "core_keyword": opportunity_core,
-                    "page_subtitle": f"围绕「{category}」寻找可迁移机会",
+                    "page_subtitle": f"3个通用原则 + 1个风险提醒",
                     "cross_page_motif_hint": (
-                        "视觉母题建议用地图标记、机会蓝图、路线箭头和风险边界线贯穿全页。"
+                        "视觉母题建议用清单勾选、迁移箭头、风险警示牌贯穿全页。"
                         f"\n隐喻预设参考：{opportunity_metaphors}"
                     ),
                     "points": _format_points(
                         extract_bullets(dim5, 3)
-                        or ["可借鉴：复制卖点结构而非照搬商品", f"切入点：围绕{category}做细分", "风险：同质化与平台规则变化"]
+                        or ["原则①：卖省的时间而非卖内容多", f"原则②：差评是最好的选品工具", f"风险：{category}同品类价格战，壁垒靠持续输出"]
                     ),
-                    "aux_poetry": "机会不是答案，是地图上的下一枚标记。",
+                    "aux_poetry": "最值得学的不是品类，而是背后可迁移的设计原则。",
+                }
+                )
+            ),
+        },
+        {
+            "page_num": 5,
+            "title": "资料预览",
+            "core_keyword": product_name,
+            "prompt": _productize_prompt(
+                render_inner_prompt(
+                {
+                    "page_title": "完整拆解报告预览",
+                    "core_keyword": product_name,
+                    "page_subtitle": f"{product_name} 完整操作手册",
+                    "cross_page_motif_hint": (
+                        "视觉母题建议用文档页面、目录索引、数据表格的信息密集展示。"
+                    ),
+                    "points": _format_points(
+                        [f"五维深度分析：{category}赛道全景", "操作手册：从选品到变现完整路径", "数据对标：同品类竞品分析"]
+                    ),
+                    "aux_poetry": "这只是冰山一角，完整版远比你看到的多。",
                 }
                 )
             ),

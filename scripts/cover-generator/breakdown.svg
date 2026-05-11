@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <!-- B：深墨绿 + 翡翠绿 -->
+    <radialGradient id="bgCore" cx="0.15" cy="0.1" r="0.8">
+      <stop offset="0%" stop-color="#0F1A16"/>
+      <stop offset="100%" stop-color="#0A1210"/>
+    </radialGradient>
+    <radialGradient id="coolEdge" cx="0.85" cy="0.9" r="0.7">
+      <stop offset="0%" stop-color="#0D1814"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <radialGradient id="accentGlow" cx="0.25" cy="0.4" r="0.5">
+      <stop offset="0%" stop-color="#00D4AA" stop-opacity="0.08"/>
+      <stop offset="50%" stop-color="#00D4AA" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#00D4AA" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bottomWeight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="50%" stop-color="transparent"/>
+      <stop offset="100%" stop-color="#00D4AA" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="sideBar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00D4AA"/>
+      <stop offset="100%" stop-color="#00A885"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1350" fill="url(#bgCore)"/>
+  <rect width="1080" height="1350" fill="url(#coolEdge)"/>
+  <rect width="1080" height="1350" fill="url(#accentGlow)"/>
+  <rect width="1080" height="1350" fill="url(#bottomWeight)"/>
+  <rect width="1080" height="1350" filter="url(#grain)" opacity="0.03"/>
+
+  <text x="640" y="1060" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="480" font-weight="900" fill="#FFFFFF" opacity="0.025" text-anchor="middle" letter-spacing="20">012</text>
+
+  <rect x="860" y="320" width="100" height="100" fill="none" stroke="#00D4AA" stroke-width="0.8" opacity="0.08" rx="3"/>
+  <rect x="882" y="342" width="56" height="56" fill="none" stroke="#6B9E8A" stroke-width="0.5" opacity="0.06" rx="2"/>
+  <line x1="80" y1="580" x2="170" y2="580" stroke="#00D4AA" stroke-width="1.5" opacity="0.15"/>
+  <line x1="80" y1="596" x2="130" y2="596" stroke="#6B9E8A" stroke-width="1" opacity="0.08"/>
+
+  <rect x="0" y="0" width="5" height="1350" fill="url(#sideBar)"/>
+
+  <circle cx="80" cy="72" r="4" fill="#00D4AA"/>
+  <text x="98" y="80" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="400" fill="#00D4AA" letter-spacing="3" opacity="0.7">虚拟产品实操手记</text>
+
+  <text x="80" y="300" font-family="PingFang SC, Noto Sans SC, sans-serif" font-weight="900" fill="#FFFFFF">
+    <tspan font-size="96" x="80" dy="0">9块9的备课资料</tspan>
+    <tspan font-size="96" x="80" dy="120">卖的不是</tspan>
+    <tspan font-size="96" x="80" dy="120" fill="#00D4AA">PPT</tspan>
+  </text>
+
+  <text x="80" y="640" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="26" font-weight="400" fill="#FFFFFF" opacity="0.35" letter-spacing="1">
+    <tspan x="80" dy="0">买家花的不是9块9买50页PPT</tspan>
+    <tspan x="80" dy="40">是省掉3小时备课时间</tspan>
+  </text>
+
+  <rect x="80" y="750" width="50" height="2" fill="#6B9E8A" opacity="0.4"/>
+
+  <text x="80" y="790" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="24" font-weight="400" fill="rgba(255,255,255,0.35)" letter-spacing="2">教师备课资料包 · 9.9元 · 4000+单</text>
+  <text x="80" y="848" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="20" font-weight="400" fill="#00D4AA" opacity="0.6">— 虚拟产品实操手记</text>
+
+  <circle cx="960" cy="200" r="2" fill="#00D4AA" opacity="0.1"/>
+  <circle cx="940" cy="580" r="3" fill="#00D4AA" opacity="0.08"/>
+  <circle cx="960" cy="600" r="2" fill="#6B9E8A" opacity="0.06"/>
+  <circle cx="200" cy="1100" r="2" fill="#00D4AA" opacity="0.06"/>
+
+  <line x1="940" y1="1080" x2="1000" y2="1080" stroke="rgba(0,212,170,0.15)" stroke-width="1"/>
+  <line x1="955" y1="1092" x2="1000" y2="1092" stroke="rgba(0,212,170,0.12)" stroke-width="1"/>
+  <line x1="970" y1="1104" x2="1000" y2="1104" stroke="rgba(0,212,170,0.09)" stroke-width="1"/>
+
+  <text x="80" y="1280" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="16" font-weight="700" fill="rgba(255,255,255,0.15)" letter-spacing="6">BREAKDOWN · NO.012</text>
+
+  <rect x="953" y="1248" width="44" height="44" fill="none" stroke="rgba(0,212,170,0.12)" stroke-width="1.5" rx="2"/>
+  <rect x="965" y="1260" width="20" height="20" fill="none" stroke="rgba(0,212,170,0.06)" stroke-width="1" rx="1"/>
+</svg>
