@@ -21,9 +21,8 @@ generate_sketchnote.py — 生成 All In Podcast 手绘笔记图片
 
 输出：/tmp/allin_<期号>_sketch_01_封面.png … _sketch_0N_<页面标题>.png
 
-支持两种模式：
-  - 动态模式（推荐）：analysis.json 含 story_plan 字段，页数/标题/内容由 AI 决定
-  - 固定模式（兼容）：无 story_plan 时回退到固定 4 页结构
+需要 analysis.json 包含 story_plan 字段（先完成 AI 分析步骤 Step 7a 生成 story_plan）。
+页数/标题/内容由 story_plan 动态决定。
 """
 
 import json
@@ -347,88 +346,6 @@ def format_points(points: list[dict]) -> str:
     )
 
 
-def build_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
-    """提取 inner_v2 模板填空参数（旧版 gpt-image-2 模式，保留兼容）。"""
-    five_dim_raw = analysis.get('five_dim', '')
-    quotes_text = analysis.get('quotes', '')
-    dim1 = extract_dim(five_dim_raw, '①')
-    dim2 = extract_dim(five_dim_raw, '②')
-    dim3 = extract_dim(five_dim_raw, '③')
-    dim4 = extract_dim(five_dim_raw, '④')
-    dim5 = extract_dim(five_dim_raw, '⑤')
-    title = record.get('中文标题', '未知标题')
-
-    page_specs = [
-        {
-            'page_title': '本期最反直觉的判断',
-            'source': f"{dim1}。{dim2}",
-            'subtitle': '看完你会重新想一遍',
-            'fallbacks': ['工具是入口', '论点链展开', '结构性变化'],
-            'motif': '让核心母题的不同侧面分别承载背景、论点和转折。',
-            'icon': '手绘入口 / 路径箭头 / 结构剖面',
-        },
-        {
-            'page_title': '嘉宾最激烈的分歧',
-            'source': dim3,
-            'subtitle': '正反两面都给足，你自己判断',
-            'fallbacks': ['趋势信号', '估值变化', '风险边界'],
-            'motif': '让母题像钟摆或天秤一样贯穿三处判断，表现紧迫感和权衡。',
-            'icon': '手绘钟摆 / 天秤 / 数据刻度',
-        },
-        {
-            'page_title': '说回咱们',
-            'source': dim4,
-            'subtitle': '对普通人意味着什么',
-            'fallbacks': ['你能做什么', '检查信号', '行动方向'],
-            'motif': '让母题像四向罗盘或十字路口，四个方向分别承载四位主播。',
-            'icon': '手绘罗盘 / 路标 / 对话批注',
-        },
-        {
-            'page_title': '完整资料预览',
-            'source': dim5,
-            'subtitle': '还有更多完整内容',
-            'fallbacks': ['完整笔记', '中英对照', '五维分析'],
-            'motif': '让母题像灯塔、种子或航线，三个要点沿光线或路径展开。',
-            'icon': '手绘灯塔 / 种子萌芽 / 航线图',
-        },
-    ]
-    spec = page_specs[page_index]
-
-    if page_index == 2 and dim4:
-        fallback = extract_bullets(dim4, 1)[0]
-        stances = {
-            name: extract_stance(dim4, name) or fallback
-            for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
-        }
-        points = [
-            {'label': name, 'text': stances[name], 'icon_hint': spec['icon']}
-            for name in ['Jason', 'Chamath', 'Sacks', 'Friedberg']
-        ]
-    else:
-        points = build_points(spec['source'], spec['fallbacks'], spec['icon'])
-
-    metaphor_key = pick_metaphor_key(f"{title} {spec['source']}")
-    metaphor_options = poster_template.METAPHOR_LIBRARY.get(metaphor_key, [])
-    metaphor_hint = metaphor_options[page_index % len(metaphor_options)] if metaphor_options else ''
-    quote = parse_first_quote(quotes_text)
-    aux_poetry = quote['zh'] if page_index == 3 and quote.get('zh') else short_phrase(spec['source'], spec['page_title'], 10)
-
-    return {
-        'page_title': spec['page_title'],
-        'core_keyword': metaphor_key if page_index == 0 else ['钟摆', '罗盘', '灯塔'][page_index - 1],
-        'page_subtitle': spec['subtitle'],
-        'points': points,
-        'cross_page_motif_hint': f"{spec['motif']} 隐喻方向参考「{metaphor_key}」：{metaphor_hint}",
-        'aux_poetry': f"「{aux_poetry}」",
-    }
-
-
-def render_inner_from_params(params: dict) -> str:
-    render_params = dict(params)
-    render_params['points'] = format_points(params['points'])
-    return poster_template.render_inner_prompt(render_params)
-
-
 # ── SVG 内页参数构建（认知驱动结构）──────────────────────────────
 
 def _strip_tags(text: str) -> str:
@@ -572,131 +489,6 @@ def _parse_zh_quotes(quotes_text: str) -> list[str]:
     return results
 
 
-def build_svg_inner_params(record: dict, analysis: dict, page_index: int) -> dict:
-    """为 SVG 内页模板构建参数。认知驱动结构：
-    0=最反直觉的判断, 1=嘉宾最激烈的分歧, 2=说回咱们, 3=完整资料预览。
-
-    每个 body section 严格限制 3 行 × 20字，匹配 SVG 模板固定布局。
-    """
-    five_dim_raw = analysis.get('five_dim', '')
-    quotes_text = analysis.get('quotes', '')
-    dim1 = _strip_tags(extract_dim(five_dim_raw, '①'))
-    dim2 = _strip_tags(extract_dim(five_dim_raw, '②'))
-    dim3 = _strip_tags(extract_dim(five_dim_raw, '③'))
-    dim4 = _strip_tags(extract_dim(five_dim_raw, '④'))
-    dim5 = _strip_tags(extract_dim(five_dim_raw, '⑤'))
-    episode = record.get('期号', '???')
-    zh_quotes = _parse_zh_quotes(quotes_text)
-    info = f"All In Podcast E{episode} · 中文知识库"
-
-    W = 40  # 字符数硬上限兜底；实际由 _wrap_lines 按像素宽度断行（_MAX_LINE_PX=970）
-
-    if page_index == 0:
-        # 本期最反直觉的判断
-        highlight = zh_quotes[0] if zh_quotes else _first_sentence(dim2, 40)
-        # 段1：背景
-        b1 = _wrap_lines(_first_sentence(dim1, 60), W)
-        # 段2：关键论点（用第二条金句或 dim2 的第二句，避免和 highlight 重复）
-        core = zh_quotes[1] if len(zh_quotes) > 1 else _first_sentence(dim2, 36)
-        b2 = ['!但他们说了一句让人重新想的话——'] + ['>' + l for l in _wrap_lines(core, W - 2, 2)]
-        # 段3：展开论证
-        sentences = [s.strip() for s in dim2.split('。') if s.strip()]
-        expand = sentences[1] + '。' if len(sentences) > 1 else _first_sentence(dim3, 60)
-        b3 = _wrap_lines(expand, W)
-        # 段4：对你意味什么
-        insight = _first_sentence(dim5, 50) if dim5 else '值得持续关注这个方向的变化。'
-        b4 = ['!对你意味着什么：'] + _wrap_lines(insight, W, 2)
-
-        return {
-            'page_title': '本期最反直觉的判断',
-            'highlight_lines': _wrap_lines(highlight, W - 2, 2),
-            'body_sections': [b1, b2, b3, b4],
-            'page_number': 2,
-            'info_text': info,
-        }
-
-    elif page_index == 1:
-        # 嘉宾最激烈的分歧
-        stances = {
-            name: _strip_tags(extract_stance(dim4, name) or '')
-            for name in ['Sacks', 'Chamath', 'Jason', 'Friedberg']
-        }
-        aggressive_name = 'Sacks' if stances.get('Sacks') else 'Chamath'
-        aggressive = stances.get(aggressive_name, '')
-        rebuttal_name = 'Jason' if stances.get('Jason') else 'Friedberg'
-        rebuttal = stances.get(rebuttal_name, '')
-
-        # 找中文金句作为 highlight（取最长的一条，不用硬编码关键词过滤）
-        dispute_quote = ''
-        if zh_quotes:
-            dispute_quote = max(zh_quotes, key=len)
-        if not dispute_quote:
-            dispute_quote = aggressive[:36] if aggressive else _first_sentence(dim3, 36)
-
-        b1 = _wrap_lines(_first_sentence(dim3, 60), W)
-        b2 = [f'!{aggressive_name}最激进：'] + ['>' + l for l in _wrap_lines(aggressive[:36] if aggressive else dim3[:30], W - 2, 2)]
-        b3 = [f'!{rebuttal_name}立刻反驳：'] + _wrap_lines(rebuttal[:40] if rebuttal else '有数据护城河的公司完全不同。', W, 2)
-        b4 = ['!对你意味着什么：'] + _wrap_lines(_first_sentence(dim5, 40) if dim5 else '留意你所在行业的替代信号。', W, 2)
-
-        return {
-            'page_title': '嘉宾最激烈的分歧',
-            'highlight_lines': _wrap_lines(dispute_quote, W - 4, 2),
-            'body_sections': [b1, b2, b3, b4],
-            'page_number': 3,
-            'info_text': info,
-        }
-
-    elif page_index == 2:
-        # 说回咱们：你现在能做什么
-        dim5_sentences = [s.strip() for s in dim5.split('。') if s.strip()]
-        # 取 dim5 第一句作为 highlight（不再硬编码固定文字）
-        highlight_text = _first_sentence(dim5, 50) if dim5 else '这期的启发值得细想。'
-
-        relevant = [s for s in dim5_sentences if len(s) >= 6]
-        if not relevant:
-            relevant = dim5_sentences[:3]
-        bullets = relevant[:3] if relevant else ['关注行业变化信号', '判断自身定位', '抓住时间窗口']
-
-        def _action_block(label: str, text: str) -> list[str]:
-            return [f'!{label}'] + _wrap_lines(text, W, 2)
-
-        b1 = _action_block('第一件事：', _first_sentence(bullets[0], 40) if bullets else '关注成本结构变化。')
-        b2 = _action_block('第二件事：', _first_sentence(bullets[1], 40) if len(bullets) > 1 else '判断你的行业是界面层还是基础设施层。')
-        b3 = _action_block('第三件事：', _first_sentence(bullets[2], 40) if len(bullets) > 2 else '今天做不起的AI项目，一年半后成本减半。')
-        # 国内对标：从 remaining sentences（排除已用的 bullets）中找
-        used_texts = set(bullets[:3])
-        remaining = [s for s in relevant if s not in used_texts]
-        china_part = next((s for s in remaining if any(k in s for k in ['国内', '中国', '字节', '阿里', '华为', '腾讯'])), '')
-        if not china_part:
-            china_part = remaining[0] if remaining else ''
-        b4 = ['!国内对标：'] + _wrap_lines(_first_sentence(china_part, 40) if china_part else '字节豆包正在走AI+SaaS融合路线。', W, 2)
-
-        return {
-            'page_title': '说回咱们：你现在能做什么',
-            'highlight_lines': _wrap_lines(highlight_text, W - 2, 2),
-            'body_sections': [b1, b2, b3, b4],
-            'page_number': 4,
-            'info_text': info,
-        }
-
-    else:
-        # 完整资料预览（动态使用当期标题）
-        ep_title = record.get('中文标题', '本期内容')
-        dim1_brief = _first_sentence(dim1, 30) if dim1 else '深度分析'
-        return {
-            'page_title': '完整资料预览',
-            'highlight_lines': _wrap_lines(f'E{episode} 完整资料已整理好', W - 2, 2),
-            'body_sections': [
-                ['!本期资料包含：', f'· {ep_title} 完整中英对照逐字稿', f'· {dim1_brief} 深度分析'],
-                ['· 精华金句双语对照', '· 嘉宾立场图谱', '· 国内市场对标分析'],
-                ['!All In Podcast 中文知识库', '持续更新中，每期从原版英文出发。', ''],
-                ['!获取方式：', '评论区置顶 或 私信「All In」', ''],
-            ],
-            'page_number': 5,
-            'info_text': info,
-        }
-
-
 def _split_title_for_cover(title: str, max_chars: int = 8) -> list[str]:
     """将中文标题拆为 2-3 行，尊重英文单词边界，递归处理长段。"""
     if len(title) <= max_chars:
@@ -794,52 +586,13 @@ def _build_dynamic_svg_pages(record: dict, analysis: dict, story_plan: dict) -> 
 
 
 def build_svg_pages(record: dict, analysis: dict) -> list:
-    """构建 SVG 渲染参数列表。优先用 story_plan 动态模式，否则回退固定结构。"""
+    """构建 SVG 渲染参数列表。需要 analysis 中包含 story_plan 字段。"""
     story_plan = analysis.get('story_plan')
     if story_plan and story_plan.get('pages'):
         return _build_dynamic_svg_pages(record, analysis, story_plan)
-    cover_raw = build_cover_params(record, analysis)
-    episode = record.get('期号', '???')
-    title = record.get('中文标题', '未知标题')
-    dim1 = _strip_tags(extract_dim(analysis.get('five_dim', ''), '①'))
-
-    # 封面标题：从中文标题衍生 2-3 行
-    title_lines = _split_title_for_cover(title)
-    # 副标题：从②核心论点提取关键短句（≤18字/行，最多2行）
-    dim2 = _strip_tags(extract_dim(analysis.get('five_dim', ''), '②'))
-    sub_sentences = [s.strip() for s in re.split(r'[。；]', dim2) if s.strip() and len(s.strip()) >= 6]
-    subtitle_lines = []
-    for s in sub_sentences[:2]:
-        s = _strip_tags(s)
-        if len(s) > 18:
-            s = s[:17] + '…'
-        subtitle_lines.append(s)
-    if not subtitle_lines:
-        subtitle_lines = [title[:18]]
-
-    pages = [{
-        'page_num': 1,
-        'title': '封面',
-        'mode': 'cover',
-        'params': {
-            'episode': episode,
-            'title_lines': title_lines,
-            'subtitle_lines': subtitle_lines,
-            'info_text': f"All In Podcast · E{episode}",
-        },
-    }]
-
-    titles = ['本期最反直觉的判断', '嘉宾最激烈的分歧', '说回咱们', '完整资料预览']
-    for idx in range(4):
-        inner_params = build_svg_inner_params(record, analysis, idx)
-        pages.append({
-            'page_num': idx + 2,
-            'title': titles[idx],
-            'mode': 'inner_svg',
-            'params': inner_params,
-        })
-
-    return pages
+    print("❌  analysis.json 中未找到 story_plan 字段。")
+    print("   请先完成 Step 7a（生成 story_plan），再运行本脚本。")
+    sys.exit(1)
 
 
 def build_page_prompts(record: dict, analysis: dict) -> list:

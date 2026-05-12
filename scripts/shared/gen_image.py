@@ -2,9 +2,8 @@
 """
 gen_image.py — 商品拆解笔记图片生成 CLI
 
-商品拆解笔记图片生成，支持两种模式：
-  - 动态模式（推荐）：analysis.json 含 story_plan 字段，页数/标题/内容由 AI 决定
-  - 固定模式（兼容）：无 story_plan 时回退到 5 张固定结构
+商品拆解笔记图片生成，需要 analysis.json 包含 story_plan 字段（先完成 Step 7a）。
+页数/标题/内容由 story_plan 动态决定。
 
 也保留单 prompt 生图兼容入口：
   python3 scripts/shared/gen_image.py --prompt "..." --output /tmp/sketch.png
@@ -278,159 +277,16 @@ def _build_dynamic_breakdown_prompts(
 def build_product_breakdown_prompts(
     record: dict[str, Any], analysis: dict[str, Any] | None = None
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    """构建商品拆解图。优先用 story_plan 动态模式，否则回退固定 5 张结构。"""
+    """构建商品拆解图。需要 analysis 中包含 story_plan 字段（先运行 Step 7a）。"""
     record = normalize_record(record)
     analysis = analysis or {}
 
     story_plan = analysis.get('story_plan')
     if story_plan and story_plan.get('pages'):
         return _build_dynamic_breakdown_prompts(record, analysis, story_plan)
-    findings: list[dict[str, str]] = []
-
-    product_name = _first(record, "商品名称", "产品名称", "标题", "title", "Title", default="未命名商品")
-    category = _first(record, "主营品类", "品类", "资产形态", "专题", default="商品品类")
-    traffic_entry = _first(record, "流量入口", "引流方式", "来源渠道", default="流量入口")
-    price = _first(record, "价格", "售价", "定价", default="价格待补充")
-    sales = _first(record, "销量", "销量数据", "已售", default="销量待补充")
-    date = _first(record, "调研日期", "发布日期", "创建时间", default=time.strftime("%Y-%m-%d"))
-
-    text = _analysis_text(analysis)
-    dim1 = extract_dim(text, "①")
-    dim2 = extract_dim(text, "②")
-    dim3 = extract_dim(text, "③")
-    dim5 = extract_dim(text, "⑤")
-
-    cover_core = product_name
-    business_core = f"{category}商业引擎"
-    traffic_core = f"{traffic_entry}流量漏斗"
-    opportunity_core = f"{category}机会地图"
-    cover_metaphors = _lookup_metaphor(cover_core, findings)
-    business_metaphors = _lookup_metaphor(business_core, findings)
-    traffic_metaphors = _lookup_metaphor(traffic_core, findings)
-    opportunity_metaphors = _lookup_metaphor(opportunity_core, findings)
-
-    cover_points = _format_points(
-        [
-            f"商品名称：{product_name}",
-            f"主营品类：{category}",
-            f"流量入口：{traffic_entry}",
-        ]
+    raise ValueError(
+        "analysis 中未找到 story_plan 字段。请先运行 Step 7a 生成 story_plan，再执行本步骤。"
     )
-    cover_prompt = _productize_prompt(
-        render_cover_prompt(
-            {
-                "episode": "商品拆解",
-                "date": date,
-                "core_word": cover_core,
-                "points": cover_points,
-                "aux_poetry": "- 「把一个商品拆成一张商业地图」\n- 「看见流量背后的结构」",
-                "forbidden": "- 不要出现推荐、种草、必买、安利等消费诱导措辞",
-                "context": f"这是一份小红书电商商品拆解，核心商品是「{product_name}」，主营品类是「{category}」，主要流量入口是「{traffic_entry}」。",
-                "core_word_symbolism": f"「{product_name}」象征一个可被拆解的商品样本；「{category}」象征赛道位置；「{traffic_entry}」象征增长入口。",
-                "metaphor_options": cover_metaphors,
-                "sub_words": "商业模式·流量转化·机会洞察",
-                "title": f"{product_name}：商品拆解笔记",
-                "duration": "产品形态·定价·转化",
-                "views": str(sales),
-                "topic": f"{category} · {traffic_entry}",
-            }
-        )
-    )
-
-    pages = [
-        {"page_num": 1, "title": "封面", "core_keyword": cover_core, "prompt": cover_prompt},
-        {
-            "page_num": 2,
-            "title": "核心卖点洞察",
-            "core_keyword": business_core,
-            "prompt": _productize_prompt(
-                render_inner_prompt(
-                {
-                    "page_title": "核心卖点洞察",
-                    "core_keyword": business_core,
-                    "page_subtitle": f"{product_name} 真正卖的是什么？",
-                    "cross_page_motif_hint": (
-                        "视觉母题建议用价格标签、时钟（省时间）、阶梯定价的剪纸结构。"
-                        f"\n隐喻预设参考：{business_metaphors}"
-                    ),
-                    "points": _format_points(
-                        extract_bullets(dim1 + "\n" + dim3, 3)
-                        or [f"反常识洞察：{category}卖的不是内容，是省下的时间", f"定价逻辑：{price}不是终点价，是进门价", "对你的启发：问自己——我卖的到底是内容还是效率？"]
-                    ),
-                    "aux_poetry": "买家花的不是钱，是对省下时间的信任。",
-                }
-                )
-            ),
-        },
-        {
-            "page_num": 3,
-            "title": "流量认知差",
-            "core_keyword": traffic_core,
-            "prompt": _productize_prompt(
-                render_inner_prompt(
-                {
-                    "page_title": "不做直播怎么卖货",
-                    "core_keyword": traffic_core,
-                    "page_subtitle": f"被低估的获客方式：{traffic_entry}",
-                    "cross_page_motif_hint": (
-                        "视觉母题建议用搜索框vs推荐流、转化率对比、手绘箭头贯穿全页。"
-                        f"\n隐喻预设参考：{traffic_metaphors}"
-                    ),
-                    "points": _format_points(
-                        extract_bullets(dim2, 3)
-                        or [f"反常识判断：主动搜你产品的人，转化率远高于推荐流量", f"获客入口：{traffic_entry}", "对你的启发：你现在拼的是推荐还是搜索？后者成本更低更稳"]
-                    ),
-                    "aux_poetry": "主动搜你的人，才是最容易成交的客户。",
-                }
-                )
-            ),
-        },
-        {
-            "page_num": 4,
-            "title": "可复用经验",
-            "core_keyword": opportunity_core,
-            "prompt": _productize_prompt(
-                render_inner_prompt(
-                {
-                    "page_title": "可复用经验",
-                    "core_keyword": opportunity_core,
-                    "page_subtitle": f"3个通用原则 + 1个风险提醒",
-                    "cross_page_motif_hint": (
-                        "视觉母题建议用清单勾选、迁移箭头、风险警示牌贯穿全页。"
-                        f"\n隐喻预设参考：{opportunity_metaphors}"
-                    ),
-                    "points": _format_points(
-                        extract_bullets(dim5, 3)
-                        or ["原则①：卖省的时间而非卖内容多", f"原则②：差评是最好的选品工具", f"风险：{category}同品类价格战，壁垒靠持续输出"]
-                    ),
-                    "aux_poetry": "最值得学的不是品类，而是背后可迁移的设计原则。",
-                }
-                )
-            ),
-        },
-        {
-            "page_num": 5,
-            "title": "资料预览",
-            "core_keyword": product_name,
-            "prompt": _productize_prompt(
-                render_inner_prompt(
-                {
-                    "page_title": "完整拆解报告预览",
-                    "core_keyword": product_name,
-                    "page_subtitle": f"{product_name} 完整操作手册",
-                    "cross_page_motif_hint": (
-                        "视觉母题建议用文档页面、目录索引、数据表格的信息密集展示。"
-                    ),
-                    "points": _format_points(
-                        [f"五维深度分析：{category}赛道全景", "操作手册：从选品到变现完整路径", "数据对标：同品类竞品分析"]
-                    ),
-                    "aux_poetry": "这只是冰山一角，完整版远比你看到的多。",
-                }
-                )
-            ),
-        },
-    ]
-    return pages, findings
 
 
 def generate_via_codex(prompt: str, output_path: Path, page_num: int = 0) -> bool:

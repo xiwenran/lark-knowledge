@@ -338,20 +338,7 @@ lark-cli docs +fetch --doc "<wiki_token>" --format markdown
 
 > 使用 `scripts/shared/poster_template.py` 的 `inner_v2` 模板。商品拆解默认使用亮色组配色（`pick_palette({"forced_palette": "A"})`），保持轻盈感。
 
-**图片生成模式**（`gen_image.py` 支持两种，自动判断）：
-
-- **有 story_plan（动态模式）**：页数和标题由 AI 决定，围绕 7a 选定的洞察点展开。`gen_image.py` 从 `analysis.story_plan` 读取 `pages` 列表，按实际页数生成内页。
-- **无 story_plan（固定模式）**：回退到固定 5 张（封面 + 核心卖点 + 流量认知差 + 可复用经验 + 资料预览）。
-
-**固定模式示例**（无 story_plan 时的默认内容框架）：
-
-| 页码 | 主题 | 写法核心 |
-|------|------|---------|
-| 1 | 封面（脚本） | 用 `generate.py breakdown` 生成，输入标题+期号 |
-| 2 | 核心卖点洞察 | 反常识开头（如"9块9卖的不是PPT，是省掉的3小时"）→ 定价逻辑 → 对你做产品意味什么 |
-| 3 | 流量认知差 | 反常识开头（如"不做直播，怎么卖了4000单？"）→ 搜索vs推荐的认知差 → 你的获客方式该怎么选 |
-| 4 | 可复用经验 | 反常识开头（如"最值得学的不是品类，而是3个通用原则"）→ 可迁移设计 + 风险提醒 + 进阶路径 |
-| 5 | 资料预览 | 截取知识库页面/操作手册的信息最密一页，暗示"完整版" |
+**前置要求**：analysis 数据必须包含 `story_plan` 字段（由 Step 7a 生成）。`gen_image.py` 从 `analysis.story_plan` 读取 `pages` 列表，页数和标题由 AI 决定，围绕 7a 选定的洞察点展开。没有 story_plan 时脚本会报错。
 
 **每张内页必须有的 3 个元素**：① 一句认知冲突金句（放页面顶部）② 支撑数据/案例/类比 ③ "对你意味什么"的落脚
 
@@ -390,7 +377,7 @@ python3 ~/lark-knowledge/scripts/shared/gen_image.py \
   --size "1024x1536"
 ```
 
-生成完成后汇报路径（封面 SVG + N 张内页 sketchnote），由用户确认质量后自行发布到小红书。动态模式下页数由 story_plan 决定；固定模式为封面 + 3 张内页 + 1 张资料预览共 5 张。
+生成完成后汇报路径（封面 SVG + N 张内页 sketchnote），由用户确认质量后自行发布到小红书。页数由 story_plan 决定。
 
 ### 7e — 上传到飞书（可选）
 

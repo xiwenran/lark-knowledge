@@ -339,9 +339,7 @@ python3 ~/lark-knowledge/scripts/allin/generate_pdf.py \
 
 使用 V2 模板（`scripts/shared/poster_template.py` 的 `cover_v2` + `inner_v2` 双模板）生成图片。提示词由 `poster_template` 统一渲染，配色使用同一组 V2 色彩体系，保证整期视觉一致。
 
-**两种模式**：
-- **动态模式（有 story_plan）**：`generate_sketchnote.py` 读取 analysis.json 里的 `story_plan` 字段，页数和每页标题由 story_plan 决定，封面文字也从 `cover_title_lines` / `cover_subtitle_lines` 读取
-- **固定模式（无 story_plan）**：回退到旧的 4 页结构（封面 + 3 张内页），适用于没有设计 story_plan 的历史期
+**前置要求**：analysis.json 必须包含 `story_plan` 字段（由 Step 10a 生成）。`generate_sketchnote.py` 从 `story_plan` 读取页数、每页标题和内容，封面文字从 `cover_title_lines` / `cover_subtitle_lines` 读取。没有 story_plan 时脚本会报错退出。
 
 **优先方式：派 Codex 生成**
 
