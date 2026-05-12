@@ -24,17 +24,17 @@
   - 下载失败时降级到 `r.jina.ai` 抓 abstract 页面
 - `transcript.py`
   - 负责 `video_bilibili` / `video_youtube` / `podcast` 的音视频转写骨架
-  - 通过 `credentials.load_local_credential("getnote_api_key")` 读取 `~/.claude/skills/lark-knowledge-intake/.local/getnote_api_key`
+  - 通过 `credentials.load_local_credential("getnote_api_key")` 读取 `~/lark-knowledge/skills/lark-knowledge-intake/.local/getnote_api_key`
   - 调用占位的 Get 笔记 API `https://api.getnote.ai/v1/transcribe`
   - 当前阶段只交付骨架 + mock 测试；真实 API key 与联调验收留待后续会话
 - `wechat.py`
   - 负责 `wechat_mp` 的微信公众号正文抓取骨架
-  - 使用 Playwright `storage_state` 复用微信登录态，cookie 固定落在 `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`
+  - 使用 Playwright `storage_state` 复用微信登录态，cookie 固定落在 `~/lark-knowledge/skills/lark-knowledge-intake/.local/wechat_cookie.json`
   - 优先提取 `#js_content`，使用 `markdownify` 转 markdown，失败时降级简易 html2text
   - 当前阶段只交付骨架 + mock 测试，真实抓取验收待后续扫码联调
 - `opencli_bridge.py`
   - 负责 `tweet` / `zhihu` / `xhs_note` 的登录态社交平台抓取骨架
-  - 优先从 `~/.claude/skills/lark-knowledge-intake/.local/opencli_config/opencli_path` 读取 OpenCLI 绝对路径，读不到再退 `PATH`
+  - 优先从 `~/lark-knowledge/skills/lark-knowledge-intake/.local/opencli_config/opencli_path` 读取 OpenCLI 绝对路径，读不到再退 `PATH`
   - 通过 `opencli fetch --url <url> --format json` 取回标准 JSON，并统一转成 markdown
   - 当前阶段只交付骨架 + mock 测试，真实凭据 / 扩展验收待后续会话
 - `paywall_domains.py`
@@ -118,7 +118,7 @@ pip install requests beautifulsoup4 trafilatura markdownify playwright 'markitdo
 
 本地凭据统一放在：
 
-`~/.claude/skills/lark-knowledge-intake/.local/`
+`~/lark-knowledge/skills/lark-knowledge-intake/.local/`
 
 由于当前 skill 目录通过 symlink 指向仓库，这个目录会实际落到仓库对应路径下的 `skills/lark-knowledge-intake/.local/`。该目录只用于本机私有 cookie、token、会话文件，必须被 `.gitignore` 排除，禁止入仓。
 
@@ -135,7 +135,7 @@ load_local_credential(name: str) -> str | None
 ## P11.4 WeChat Skeleton
 
 - 微信公众号抓取骨架已落，真实抓取验收待后续（需扫码）。
-- cookie 文件固定为 `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`，禁止入仓。
+- cookie 文件固定为 `~/lark-knowledge/skills/lark-knowledge-intake/.local/wechat_cookie.json`，禁止入仓。
 - 首次使用执行 `python -m fetchers.wechat --login`，扫码成功后会持久化 Playwright `storage_state`。
 - 本会话验收范围仅包含代码骨架与 mock 测试，不包含真实扫码与真实文章联调。
 
