@@ -2,8 +2,9 @@
 """
 gen_image.py — 商品拆解笔记图片生成 CLI
 
-默认生成 5 张小红书商品拆解图：
-  1 封面（SVG模板） + 3 内容图（核心卖点洞察 / 流量认知差 / 可复用经验） + 1 资料预览。
+商品拆解笔记图片生成，支持两种模式：
+  - 动态模式（推荐）：analysis.json 含 story_plan 字段，页数/标题/内容由 AI 决定
+  - 固定模式（兼容）：无 story_plan 时回退到 5 张固定结构
 
 也保留单 prompt 生图兼容入口：
   python3 scripts/shared/gen_image.py --prompt "..." --output /tmp/sketch.png
@@ -204,12 +205,86 @@ def _analysis_text(analysis: dict[str, Any]) -> str:
     return ""
 
 
+def _build_dynamic_breakdown_prompts(
+    record: dict[str, Any], analysis: dict[str, Any], story_plan: dict
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """story_plan 驱动的动态商品拆解图片生成。"""
+    record = normalize_record(record)
+    findings: list[dict[str, str]] = []
+
+    product_name = _first(record, "商品名称", "产品名称", "标题", "title", "Title", default="未命名商品")
+    category = _first(record, "主营品类", "品类", "资产形态", "专题", default="商品品类")
+    sales = _first(record, "销量", "销量数据", "已售", default="销量待补充")
+    date = _first(record, "调研日期", "发布日期", "创建时间", default=time.strftime("%Y-%m-%d"))
+
+    cover_title = story_plan.get('cover_title', product_name)
+    cover_metaphors = _lookup_metaphor(product_name, findings)
+    cover_points = _format_points([
+        f"商品名称：{product_name}",
+        f"品类：{category}",
+        f"洞察角度：{story_plan.get('angle', '')}",
+    ])
+    cover_prompt = _productize_prompt(
+        render_cover_prompt({
+            "episode": "商品拆解",
+            "date": date,
+            "core_word": cover_title,
+            "points": cover_points,
+            "aux_poetry": f"- 「{story_plan.get('angle', '把一个商品拆成一张商业地图')}」",
+            "forbidden": "- 不要出现推荐、种草、必买、安利等消费诱导措辞",
+            "context": f"这是一份小红书电商商品拆解，核心商品是「{product_name}」。",
+            "core_word_symbolism": f"「{product_name}」象征一个可被拆解的商品样本。",
+            "metaphor_options": cover_metaphors,
+            "sub_words": story_plan.get('angle', '商业模式·流量转化·机会洞察'),
+            "title": f"{product_name}：{story_plan.get('angle', '商品拆解')}",
+            "duration": "产品形态·定价·转化",
+            "views": str(sales),
+            "topic": f"{category}",
+        })
+    )
+
+    pages: list[dict[str, Any]] = [
+        {"page_num": 1, "title": "封面", "core_keyword": product_name, "prompt": cover_prompt},
+    ]
+
+    for idx, page_spec in enumerate(story_plan.get('pages', [])):
+        title = page_spec.get('title', f'第{idx + 2}页')
+        metaphors = _lookup_metaphor(f"{category}{title}", findings)
+        points_raw = []
+        for sec in page_spec.get('sections', []):
+            label = sec.get('label', '')
+            content = sec.get('content', '')
+            points_raw.append(f"{label}：{content}" if label else content)
+        prompt = _productize_prompt(
+            render_inner_prompt({
+                "page_title": title,
+                "core_keyword": f"{category}{title}",
+                "page_subtitle": page_spec.get('highlight', title),
+                "cross_page_motif_hint": f"隐喻预设参考：{metaphors}",
+                "points": _format_points(points_raw[:3] or [title]),
+                "aux_poetry": page_spec.get('highlight', ''),
+            })
+        )
+        pages.append({
+            "page_num": idx + 2,
+            "title": title,
+            "core_keyword": f"{category}{title}",
+            "prompt": prompt,
+        })
+
+    return pages, findings
+
+
 def build_product_breakdown_prompts(
     record: dict[str, Any], analysis: dict[str, Any] | None = None
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    """构建商品拆解 5 张图的 V2 prompt。"""
+    """构建商品拆解图。优先用 story_plan 动态模式，否则回退固定 5 张结构。"""
     record = normalize_record(record)
     analysis = analysis or {}
+
+    story_plan = analysis.get('story_plan')
+    if story_plan and story_plan.get('pages'):
+        return _build_dynamic_breakdown_prompts(record, analysis, story_plan)
     findings: list[dict[str, str]] = []
 
     product_name = _first(record, "商品名称", "产品名称", "标题", "title", "Title", default="未命名商品")

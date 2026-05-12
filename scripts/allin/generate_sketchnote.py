@@ -19,7 +19,11 @@ generate_sketchnote.py — 生成 All In Podcast 手绘笔记图片
   # 只看提示词，不调 API：
   python3 generate_sketchnote.py --record-id recXXX --prompts-only
 
-输出：/tmp/allin_<期号>_sketch_01_封面.png … _sketch_0N_国内启示.png
+输出：/tmp/allin_<期号>_sketch_01_封面.png … _sketch_0N_<页面标题>.png
+
+支持两种模式：
+  - 动态模式（推荐）：analysis.json 含 story_plan 字段，页数/标题/内容由 AI 决定
+  - 固定模式（兼容）：无 story_plan 时回退到固定 4 页结构
 """
 
 import json
@@ -121,10 +125,10 @@ def parse_pages_arg(arg) -> set[int] | None:
     for item in text.split(','):
         item = item.strip()
         if not item or not item.isdigit():
-            raise argparse.ArgumentTypeError('--pages 只接受 1-5 的数字，多个页码用英文逗号分隔')
+            raise argparse.ArgumentTypeError('--pages 只接受数字，多个页码用英文逗号分隔')
         page_num = int(item)
-        if page_num < 1 or page_num > 5:
-            raise argparse.ArgumentTypeError('--pages 页码范围只能是 1-5')
+        if page_num < 1 or page_num > 20:
+            raise argparse.ArgumentTypeError('--pages 页码范围只能是 1-20')
         pages.add(page_num)
     return pages
 
@@ -622,12 +626,10 @@ def build_svg_inner_params(record: dict, analysis: dict, page_index: int) -> dic
         rebuttal_name = 'Jason' if stances.get('Jason') else 'Friedberg'
         rebuttal = stances.get(rebuttal_name, '')
 
-        # 找中文金句作为 highlight
+        # 找中文金句作为 highlight（取最长的一条，不用硬编码关键词过滤）
         dispute_quote = ''
-        for q in zh_quotes:
-            if any(k in q for k in ['SaaS', '半', '估值', '替代', '债务', '腰斩']):
-                dispute_quote = q
-                break
+        if zh_quotes:
+            dispute_quote = max(zh_quotes, key=len)
         if not dispute_quote:
             dispute_quote = aggressive[:36] if aggressive else _first_sentence(dim3, 36)
 
@@ -646,15 +648,14 @@ def build_svg_inner_params(record: dict, analysis: dict, page_index: int) -> dic
 
     elif page_index == 2:
         # 说回咱们：你现在能做什么
-        highlight_text = '大部分人关注"AI会不会取代我"——更该关注的是"我的成本结构变了没"。'
-
-        # 从 dim5 提取，但过滤掉明显无关的话题（农药、法律、医学等）
-        skip_keywords = ['氯吡', '农药', '农产品', 'SPLC', '结直肠', '癌', '起诉']
         dim5_sentences = [s.strip() for s in dim5.split('。') if s.strip()]
-        relevant = [s for s in dim5_sentences if not any(k in s for k in skip_keywords)]
+        # 取 dim5 第一句作为 highlight（不再硬编码固定文字）
+        highlight_text = _first_sentence(dim5, 50) if dim5 else '这期的启发值得细想。'
+
+        relevant = [s for s in dim5_sentences if len(s) >= 6]
         if not relevant:
             relevant = dim5_sentences[:3]
-        bullets = relevant[:3] if relevant else ['关注成本结构变化', '判断行业位置', '抓住算力降价窗口']
+        bullets = relevant[:3] if relevant else ['关注行业变化信号', '判断自身定位', '抓住时间窗口']
 
         def _action_block(label: str, text: str) -> list[str]:
             return [f'!{label}'] + _wrap_lines(text, W, 2)
@@ -679,14 +680,16 @@ def build_svg_inner_params(record: dict, analysis: dict, page_index: int) -> dic
         }
 
     else:
-        # 完整资料预览
+        # 完整资料预览（动态使用当期标题）
+        ep_title = record.get('中文标题', '本期内容')
+        dim1_brief = _first_sentence(dim1, 30) if dim1 else '深度分析'
         return {
             'page_title': '完整资料预览',
-            'highlight_lines': ['中英对照逐字稿 + 五维深度分析', '全部整理好了，觉得有用先收着。'],
+            'highlight_lines': _wrap_lines(f'E{episode} 完整资料已整理好', W - 2, 2),
             'body_sections': [
-                ['!本期资料包含：', '· 完整中英对照逐字稿', '· 五维深度分析'],
-                ['· 精华金句双语对照', '· 四位嘉宾立场图谱', '· 国内市场对标分析'],
-                ['!All In Podcast 中文知识库', '200+期结构化整理，持续更新中。', '每期从原版英文出发，AI辅助翻译+人工校对。'],
+                ['!本期资料包含：', f'· {ep_title} 完整中英对照逐字稿', f'· {dim1_brief} 深度分析'],
+                ['· 精华金句双语对照', '· 嘉宾立场图谱', '· 国内市场对标分析'],
+                ['!All In Podcast 中文知识库', '持续更新中，每期从原版英文出发。', ''],
                 ['!获取方式：', '评论区置顶 或 私信「All In」', ''],
             ],
             'page_number': 5,
@@ -725,8 +728,76 @@ def _split_title_for_cover(title: str, max_chars: int = 8) -> list[str]:
     return lines or [title]
 
 
+def _build_dynamic_inner_params(page_spec: dict, info_text: str, page_number: int) -> dict:
+    """从 story_plan 的单页规格构建 SVG 内页渲染参数。"""
+    W = 40
+    highlight = page_spec.get('highlight', '')
+    sections = page_spec.get('sections', [])
+
+    body_sections = []
+    for sec in sections:
+        label = sec.get('label', '')
+        content = sec.get('content', '')
+        if label:
+            lines = [f'!{label}'] + _wrap_lines(content, W, 2)
+        else:
+            lines = _wrap_lines(content, W)
+        body_sections.append(lines)
+
+    while len(body_sections) < 4:
+        body_sections.append([''])
+
+    return {
+        'page_title': page_spec.get('title', f'第{page_number}页'),
+        'highlight_lines': _wrap_lines(highlight, W - 2, 2),
+        'body_sections': body_sections[:4],
+        'page_number': page_number,
+        'info_text': info_text,
+    }
+
+
+def _build_dynamic_svg_pages(record: dict, analysis: dict, story_plan: dict) -> list:
+    """story_plan 驱动的动态页面构建：页数和标题由 AI 决定。"""
+    episode = record.get('期号', '???')
+    info = f"All In Podcast E{episode} · 中文知识库"
+
+    cover_title = story_plan.get('cover_title_lines') or _split_title_for_cover(
+        record.get('中文标题', '未知标题'))
+    cover_subtitle = story_plan.get('cover_subtitle_lines', [])
+    if not cover_subtitle:
+        dim2 = _strip_tags(extract_dim(analysis.get('five_dim', ''), '②'))
+        sub_sentences = [s.strip() for s in re.split(r'[。；]', dim2) if s.strip() and len(s.strip()) >= 6]
+        cover_subtitle = [s[:18] for s in sub_sentences[:2]]
+
+    pages = [{
+        'page_num': 1,
+        'title': '封面',
+        'mode': 'cover',
+        'params': {
+            'episode': episode,
+            'title_lines': cover_title,
+            'subtitle_lines': cover_subtitle,
+            'info_text': f"All In Podcast · E{episode}",
+        },
+    }]
+
+    for idx, page_spec in enumerate(story_plan.get('pages', [])):
+        params = _build_dynamic_inner_params(page_spec, info, idx + 2)
+        pages.append({
+            'page_num': idx + 2,
+            'title': page_spec.get('title', f'第{idx + 2}页'),
+            'mode': 'inner_svg',
+            'params': params,
+        })
+
+    return pages
+
+
 def build_svg_pages(record: dict, analysis: dict) -> list:
-    """构建 SVG 渲染参数列表：1 封面 + 4 内页。"""
+    """构建 SVG 渲染参数列表。优先用 story_plan 动态模式，否则回退固定结构。"""
+    story_plan = analysis.get('story_plan')
+    if story_plan and story_plan.get('pages'):
+        return _build_dynamic_svg_pages(record, analysis, story_plan)
     cover_raw = build_cover_params(record, analysis)
     episode = record.get('期号', '???')
     title = record.get('中文标题', '未知标题')

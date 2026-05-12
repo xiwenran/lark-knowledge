@@ -294,9 +294,50 @@ python3 ~/lark-knowledge/scripts/allin/generate_pdf.py \
 
 ---
 
+### 🤖 Step 10a：选题与故事线设计
+
+从五维分析中提取 2-3 个最有价值的洞察点，每个点能独立成为一篇小红书笔记。
+
+选题标准：
+- 有认知冲突（读者看完会"原来如此"）
+- 有数据/案例支撑（不是空洞观点）
+- 能翻译成中国读者的语境
+
+为选中的洞察点设计 story_plan，写入 analysis.json：
+
+```json
+{
+  "story_plan": {
+    "angle": "选中的洞察点一句话描述",
+    "cover_title_lines": ["封面标题第1行", "第2行"],
+    "cover_subtitle_lines": ["副标题第1行", "副标题第2行"],
+    "pages": [
+      {
+        "title": "页面标题（跟着内容走，不固定）",
+        "highlight": "本页核心金句",
+        "sections": [
+          {"label": "段标题", "content": "段内容，≤40字"},
+          {"label": "段标题", "content": "段内容"},
+          {"label": "段标题", "content": "段内容"},
+          {"label": "对你意味着什么", "content": "行动启发"}
+        ]
+      }
+    ]
+  }
+}
+```
+
+一期可设计多个 story_plan（不同角度），每个生成独立的一组图片。
+
+---
+
 ### 🤖 Step 10：生成手绘笔记（V2 模板，Codex 优先 → API fallback）
 
-使用 V2 模板（`scripts/shared/poster_template.py` 的 `cover_v2` + `inner_v2` 双模板），生成 5 张图：1 张封面 + 4 张内页。提示词由 `poster_template` 统一渲染，配色使用同一组 V2 色彩体系，保证整期视觉一致。
+使用 V2 模板（`scripts/shared/poster_template.py` 的 `cover_v2` + `inner_v2` 双模板）生成图片。提示词由 `poster_template` 统一渲染，配色使用同一组 V2 色彩体系，保证整期视觉一致。
+
+**两种模式**：
+- **动态模式（有 story_plan）**：`generate_sketchnote.py` 读取 analysis.json 里的 `story_plan` 字段，页数和每页标题由 story_plan 决定，封面文字也从 `cover_title_lines` / `cover_subtitle_lines` 读取
+- **固定模式（无 story_plan）**：回退到旧的 4 页结构（封面 + 3 张内页），适用于没有设计 story_plan 的历史期
 
 **优先方式：派 Codex 生成**
 
@@ -313,7 +354,7 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
 目标：用 gpt-image-2 生成一张手绘笔记图片
 提示词：<该张图的完整提示词>
 尺寸：1024x1536
-保存路径：/tmp/allin_<期号>_sketch_0N_<主题>.png
+保存路径：/tmp/allin_<期号>_sketch_0N_<页面标题>.png
 ```
 
 **Fallback：Codex 失败时走 API**
@@ -325,14 +366,7 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
   --record-id "<record_id>"
 ```
 
-输出：`/tmp/allin_<期号>_sketch_01_封面.png` … `_sketch_0N_国内启示.png`
-
-固定结构（封面用 SVG 模板，内页用 V2 sketchnote）：
-- **第 1 张（封面）**：用 `scripts/cover-generator/generate.py allin` 脚本生成（深蓝黑+金色模板），输入标题+期号即可
-- **第 2 张（本期最反直觉的判断）**：`inner_v2`，认知冲突开头 → 数据/案例支撑 → 对你的启发
-- **第 3 张（嘉宾最激烈的分歧）**：`inner_v2`，正反方都给足论据，让读者自己判断 → 代入感
-- **第 4 张（说回咱们：你现在能做什么）**：`inner_v2`，场景代入 → 具体行动 → 让人想截图保存
-- **第 5 张（资料预览）**：`inner_v2`，截取 PDF/笔记资料的信息最密一页，暗示"完整版"
+输出：`/tmp/allin_<期号>_sketch_01_封面.png` … `_sketch_0N_<页面标题>.png`
 
 **每张内页必须有的 3 个元素**：① 一句认知冲突金句（放页面顶部）② 支撑数据/案例/类比 ③ "对你意味什么"的落脚
 
@@ -356,7 +390,7 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
   --output-dir /tmp
 ```
 
-耗时参考：单张约 3-5 分钟；全 5 张并发约 5-7 分钟。
+耗时参考：单张约 3-5 分钟；全张并发约 5-7 分钟。
 
 ---
 
