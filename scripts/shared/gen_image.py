@@ -369,16 +369,16 @@ def build_product_breakdown_prompts(
             "prompt": _productize_prompt(
                 render_inner_prompt(
                 {
-                    "page_title": "流量认知差",
+                    "page_title": "不做直播怎么卖货",
                     "core_keyword": traffic_core,
-                    "page_subtitle": f"从「{traffic_entry}」看被低估的获客方式",
+                    "page_subtitle": f"被低估的获客方式：{traffic_entry}",
                     "cross_page_motif_hint": (
                         "视觉母题建议用搜索框vs推荐流、转化率对比、手绘箭头贯穿全页。"
                         f"\n隐喻预设参考：{traffic_metaphors}"
                     ),
                     "points": _format_points(
                         extract_bullets(dim2, 3)
-                        or [f"反常识洞察：搜索流量转化率比推荐流量高3-5倍", f"入口：{traffic_entry}", "对你的启发：你现在的获客方式是搜索还是推荐？"]
+                        or [f"反常识判断：主动搜你产品的人，转化率远高于推荐流量", f"获客入口：{traffic_entry}", "对你的启发：你现在拼的是推荐还是搜索？后者成本更低更稳"]
                     ),
                     "aux_poetry": "主动搜你的人，才是最容易成交的客户。",
                 }
