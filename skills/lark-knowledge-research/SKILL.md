@@ -1,18 +1,19 @@
 ---
 name: lark-knowledge-research
-version: 0.2.0
+version: 0.3.0
 description: "知识补漏研究：识别知识库空白并走完四步闭环中的后三步。触发词：/补空白、/Deep Research、/研究补漏。"
 metadata:
   requires:
     bins: ["python3", "lark-cli"]
 ---
 
-# lark-knowledge-research (v0.2.0)
+# lark-knowledge-research (v0.3.0)
 
 **CRITICAL — 开始前 MUST 先用 Read 工具读取：**
 1. `../lark-shared/SKILL.md` — 认证、权限处理
 2. `~/.agents/skills/lark-knowledge-config/config.json` — `research_draft_table_id` / `research_draft_node_token`
 3. `../lark-knowledge-lint/SKILL.md` — 巡检输出格式与空白/松散聚类契约
+4. `scripts/lark_research/source_planner.py` — P1-E 资料来源计划与搜索优先级
 
 ## 功能定位
 
@@ -39,13 +40,16 @@ metadata:
 ① 空白识别
    blank_identifier.py / task_list_generator.py
    ↓
-② Tavily 搜索
-   tavily_search.py
+② 资料来源计划
+   source_planner.py（飞书公共知识库优先）
    ↓
-③ 主会话 Claude 提炼（不调 API）
+③ 搜索执行
+   Google / 手工链接 / Tavily 可选
+   ↓
+④ 主会话 Claude 提炼（不调 API）
    主会话读取搜索 JSON，整理成 markdown 草稿
    ↓
-④ 回写飞书“待确认”区
+⑤ 回写飞书“待确认”区
    draft_writer.py
 ```
 
@@ -68,7 +72,27 @@ python3 scripts/lark_research/blank_identifier.py \
 
 输出是结构化研究任务，不是最终正文。
 
-### Step 2: Tavily 搜索
+### Step 1.5: P1-E 资料来源计划（飞书知识库优先）
+
+```bash
+python3 scripts/lark_research/source_planner.py \
+  --tasks-json /tmp/research_tasks.json \
+  --json-out /tmp/research_source_plan.json \
+  --markdown-out /tmp/research_source_plan.md
+```
+
+脚本只生成检索计划，不访问网络、不写飞书。
+
+资料来源优先级固定为：
+1. **主来源：飞书公共知识库** — Google 查询 `site:docs.feishu.cn + 关键词`
+2. **官方依据** — 对应平台/产品/政策/工具的官网、帮助中心、开放平台文档
+3. **行业与案例补充** — 行业报告、案例、SOP、社区讨论
+4. **Tavily 可选聚合** — 仅在有 API 额度时启用；无额度时跳过
+5. **手工指定来源** — 用户直接给出的 URL 必须纳入
+
+P1-E 的草稿必须优先使用飞书公共知识库搭骨架，外部资料只补飞书资料没有覆盖的部分。
+
+### Step 2: Tavily 搜索（可选）
 
 ```bash
 python3 scripts/lark_research/tavily_search.py \
@@ -77,6 +101,7 @@ python3 scripts/lark_research/tavily_search.py \
 ```
 
 脚本行为：
+- 仅在 `TAVILY_API_KEY` 可用且用户需要聚合搜索时运行
 - 读取 `blank_identifier.py` / `task_list_generator.py` 产出的任务 JSON
 - 每个 gap 自动生成 2-3 个 Tavily query
 - 调用 `https://api.tavily.com/search`
@@ -98,6 +123,28 @@ python3 scripts/lark_research/tavily_search.py \
 - 归纳冲突信息
 - 产出 markdown 草稿
 - 保留来源链接
+- 按 `source_planner.py` 的来源优先级标注主来源、官方依据、行业补充、手工来源和未覆盖问题
+
+草稿末尾必须包含：
+
+```markdown
+## 资料来源
+
+### 主来源：飞书公共知识库
+- 标题｜URL｜支撑的判断｜时效性
+
+### 官方依据
+- 标题｜URL｜补充的能力边界
+
+### 行业与案例补充
+- 标题｜URL｜补充的案例或语境
+
+### 手工来源
+- 标题｜URL｜用户指定原因
+
+### 未覆盖问题
+- 本轮没有找到可靠来源的问题
+```
 
 **禁止**在 research 脚本中私自调用 Anthropic API。
 
@@ -177,7 +224,7 @@ research 写回至少需要以下二选一：
 
 ## 输入源
 
-支持两类入口：
+支持三类入口：
 
 ### A. 来自 lint 的空白/松散聚类清单
 
@@ -202,7 +249,11 @@ research 写回至少需要以下二选一：
 }
 ```
 
-### B. 手工指定主题
+### B. source_planner 资料来源计划
+
+`source_planner.py` 接收 Step 1 的任务 JSON，输出可由 Claude Code 与 Codex 共同执行的来源计划。它不依赖 Tavily，默认生成 Google 查询模板，确保 Claude 端也能按同一来源优先级执行。
+
+### C. 手工指定主题
 
 ```text
 /补空白 研究 Claude Code 子代理协作
