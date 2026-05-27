@@ -71,8 +71,8 @@
   - 登录态失效时稳定返回重新登录提示
 - `source_type=xhs_note` / `xhs_product` / `xhs_shop` / `xhs_profile`
   - 禁止走 OpenCLI Browser Bridge、MediaCrawler cookie/qrcode 或任何浏览器 cookie 方案
-  - 商品/店铺仅允许公开 H5 API、公开 H5 页面、无登录 Playwright/Jina、用户手动提供内容/OCR
-  - 公开路径不足时返回 `FetchResult(success=False, source_type='fetch_failed')` 或把缺口写入 meta，不提示登录
+  - 商品/店铺仅允许公开 H5 API、公开 H5 页面、无登录 Playwright/Jina、用户手动提供内容；详情图 OCR 只作为内部处理手段
+  - 公开路径不足时返回 `FetchResult(success=False, source_type='fetch_failed')` 或把来源限制写入 meta，不提示登录；这些限制不得进入升级成品页正文
 - `source_type=video_bilibili` / `video_youtube` / `podcast`
   - 直接走 `transcript.fetch()`
   - `429` 仅重试一次，间隔 `5s`
@@ -180,6 +180,6 @@ load_local_credential(name: str) -> str | None
 小红书商品调研应走 P2-B2 免登录方案：
 - `/goods-detail/<sku_id>` → 公开 H5 API `https://mall.xiaohongshu.com/api/store/jpd/edith/detail/h5/toc?version=0.0.5&item_id=<sku_id>`
 - `sellerH5.link` / `/shop/<seller_id>` → 公开店铺页
-- `graphicDetailsV4.images` → 详情图 URL，必要时交给 OCR
+- `graphicDetailsV4.images` → 详情图 URL，必要时交给内部 OCR 处理
 
-账号主页笔记、置顶内容、爆款笔记不是免登录硬能力；若公开页面无法取得，必须标记为信息缺口，不得切换到登录态抓取。
+账号主页笔记、置顶内容、爆款笔记不是免登录硬能力；若公开页面无法取得，只能记录到 fetcher `meta` / 多维表格备注，不得切换到登录态抓取，也不得在知识库成品页生成“信息缺口”章节。

@@ -208,7 +208,7 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 - 允许路径：
   - 商品详情：公开 H5 API + 无登录 Playwright/Jina 兜底。
   - 店铺基础画像与店铺商品矩阵：`sellerH5.link` / `/shop/{sellerId}` 公开店铺页。
-  - 详情图：公开图片 URL + 后续 OCR。
+  - 详情图：公开图片 URL + 内部 OCR 处理；升级成品页不得暴露 OCR/抓取过程。
 - 禁止路径：
   - 不使用 OpenCLI Browser Bridge 抓小红书。
   - 不使用 MediaCrawler 的 `--lt cookie` / `--lt qrcode` 抓小红书。
@@ -216,7 +216,7 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
   - 不读取用户本机 Chrome/Safari/Arc 等浏览器的小红书 cookie。
 - 验收：
   - 给定 `goods-detail` URL，能免登录提取商品名、价格、销量、店铺名、店铺 URL、店铺粉丝、店铺已售、发货地、服务保障、主图 URL、详情图 URL。
-  - 若公开路径无法取得账号主页笔记/置顶/爆款内容，结果明确写“公开路径不足”，不提示登录。
+  - 若公开路径无法取得账号主页笔记/置顶/爆款内容，只写入内部备注/meta，不提示登录，也不在成品页生成“信息缺口”章节。
 - 状态：⏸ 待启动
 
 ### P2-C: Intake 5维分析框架（全库通用）
