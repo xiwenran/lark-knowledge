@@ -114,7 +114,7 @@ lark-knowledge/
 
 ### Skill 内部模型约定优先
 
-进入任何 skill 流程前，先扫 SKILL.md 的模型/工具约定段落（如"翻译用 Doubao"、"图生成走 worker"）。
+进入任何 skill 流程前，先扫 SKILL.md 的模型/工具约定段落（如"翻译用 Doubao"、"图生成走 Codex 图像能力优先，失败再走 API fallback"——注意此处 Codex 指 OpenAI 图像模型，不是 Echo 三模型分工里的 worker）。
 有约定 → 按 skill 约定执行，不被通用「文本→writer」原则覆盖。
 无约定 → 走全局三模型分工规则。
 
