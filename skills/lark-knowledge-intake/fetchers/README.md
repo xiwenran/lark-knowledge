@@ -33,7 +33,8 @@
   - 优先提取 `#js_content`，使用 `markdownify` 转 markdown，失败时降级简易 html2text
   - 当前阶段只交付骨架 + mock 测试，真实抓取验收待后续扫码联调
 - `opencli_bridge.py`
-  - 负责 `tweet` / `zhihu` / `xhs_note` 的登录态社交平台抓取骨架
+  - 负责 `tweet` / `zhihu` 的登录态社交平台抓取骨架
+  - 小红书禁止接入该登录态路径；`opencli_bridge.py` 内部必须继续对 `xhs` fail-closed
   - 优先从 `~/lark-knowledge/skills/lark-knowledge-intake/.local/opencli_config/opencli_path` 读取 OpenCLI 绝对路径，读不到再退 `PATH`
   - 通过 `opencli fetch --url <url> --format json` 取回标准 JSON，并统一转成 markdown
   - 当前阶段只交付骨架 + mock 测试，真实凭据 / 扩展验收待后续会话
@@ -65,9 +66,13 @@
 - `source_type=wechat_mp`
   - 直接走 `wechat.fetch()`
   - 未完成首次扫码时稳定返回登录指引，不抛未捕获异常
-- `source_type=tweet` / `zhihu` / `xhs_note`
+- `source_type=tweet` / `zhihu`
   - 配置 OpenCLI CLI 路径后直接走 `opencli_bridge.fetch()`
   - 登录态失效时稳定返回重新登录提示
+- `source_type=xhs_note` / `xhs_product` / `xhs_shop` / `xhs_profile`
+  - 禁止走 OpenCLI Browser Bridge、MediaCrawler cookie/qrcode 或任何浏览器 cookie 方案
+  - 商品/店铺仅允许公开 H5 API、公开 H5 页面、无登录 Playwright/Jina、用户手动提供内容/OCR
+  - 公开路径不足时返回 `FetchResult(success=False, source_type='fetch_failed')` 或把缺口写入 meta，不提示登录
 - `source_type=video_bilibili` / `video_youtube` / `podcast`
   - 直接走 `transcript.fetch()`
   - `429` 仅重试一次，间隔 `5s`
@@ -167,3 +172,14 @@ load_local_credential(name: str) -> str | None
   - `{title, content, media_urls, author, platform}`
 - stderr 命中 `auth` / `login` / `session` 会收敛为登录态失效提示。
 - 本会话验收范围仅包含代码骨架与 mock 测试，不包含 Browser Bridge、Node.js CLI 与真实平台联调。
+
+### 小红书禁用说明
+
+小红书不属于 P11.6 登录态社交平台验收范围。现有 OpenCLI / MediaCrawler / redbook / xhs-cli / xiaohongshu-cli / XHS-Downloader 这类需要 cookie、二维码或浏览器登录态的路径，不得用于本项目的小红书 intake。
+
+小红书商品调研应走 P2-B2 免登录方案：
+- `/goods-detail/<sku_id>` → 公开 H5 API `https://mall.xiaohongshu.com/api/store/jpd/edith/detail/h5/toc?version=0.0.5&item_id=<sku_id>`
+- `sellerH5.link` / `/shop/<seller_id>` → 公开店铺页
+- `graphicDetailsV4.images` → 详情图 URL，必要时交给 OCR
+
+账号主页笔记、置顶内容、爆款笔记不是免登录硬能力；若公开页面无法取得，必须标记为信息缺口，不得切换到登录态抓取。

@@ -1,6 +1,6 @@
 ---
 name: lark-knowledge-intake
-version: 2.0.1
+version: 2.0.2
 description: "知识收件入表：将外部资料AI结构化处理后写入飞书多维表格。触发词：收件、入表、收录、处理资料。"
 metadata:
   requires:
@@ -60,7 +60,24 @@ C. **手动兜底（以上均失败时）**：
 
 用户提供 PDF 后用 PDF Skill 识别；提供文本后直接处理。
 
-**登录态社交平台**（`x.com` / `twitter.com` / `zhihu.com` / `xiaohongshu.com`）：
+**小红书商品 / 店铺（免登录路径，仅限公开页）**：
+
+小红书 intake 的主路径只允许免登录公开数据，不允许读取用户账号态。已核对 GitHub 开源实现与本地实测，商品页可通过公开 H5 API 和公开 H5 页面取得核心数据。
+
+允许路径：
+- 商品详情页（`/goods-detail/<sku_id>`）：优先调用公开 H5 API `https://mall.xiaohongshu.com/api/store/jpd/edith/detail/h5/toc?version=0.0.5&item_id=<sku_id>`，提取 `descriptionH5`、`priceH5`、`sellerH5`、`carouselH5`、`graphicDetailsV4`。
+- 店铺页：从 `sellerH5.link` / `sellerH5.id` 取得 `https://www.xiaohongshu.com/shop/<seller_id>`，只抓公开展示的店铺基础画像与商品矩阵。
+- 详情图：保留公开图片 URL；需要课程结构、卖点、适合人群、交付清单时，后续接 OCR。
+- 降级：公开 H5 API 失败时，可用无登录 Playwright Stealth / Jina / 用户手动提供文本或截图兜底。
+
+禁止路径：
+- 不使用 OpenCLI Browser Bridge 抓小红书。
+- 不使用 MediaCrawler 的 `--lt cookie` / `--lt qrcode` 抓小红书。
+- 不使用 redbook、xhs-cli、xiaohongshu-cli、XHS-Downloader 等依赖 cookie、二维码或浏览器登录态的方案抓小红书。
+- 不读取用户本机 Chrome、Safari、Arc、Edge 等浏览器的小红书 cookie。
+- 账号主页笔记、置顶内容、爆款笔记若无法通过公开 URL 直接取得，必须写“公开路径不足”，不得提示用户登录或切换到 cookie 方案。
+
+**登录态社交平台**（`x.com` / `twitter.com` / `zhihu.com`，不含小红书）：
 
 - 首次真实使用前需先安装 OpenCLI 的 Chrome Browser Bridge 扩展，并安装 Node.js CLI。
 - 将 OpenCLI 绝对路径写入 `~/lark-knowledge/skills/lark-knowledge-intake/.local/opencli_config/opencli_path`。

@@ -138,17 +138,20 @@
 - **启动前需用户确认**：Get 笔记 API 费率 / 稳定性
 - **状态**：✅ 已完成（骨架，commit `47e249c`，2026-04-21；Get 笔记 API key 真调用验收待后续会话）
 
-### P11.6 · 登录态社交平台（OpenCLI 适配器）
-- **目标**：推特 / 知乎 / 小红书偶发归档能拿到正文
+### P11.6 · 登录态社交平台（OpenCLI 适配器，不含小红书）
+- **目标**：推特 / 知乎偶发归档能拿到正文；小红书不得走登录态抓取
 - **涉及文件**：
   - `fetchers/opencli_bridge.py`（OpenCLI CLI 调用封装）
   - SKILL.md：Browser Bridge 扩展安装引导段
   - `~/.claude/skills/lark-knowledge-intake/.local/opencli_config/`
+- **小红书禁令**：
+  - 禁止把 OpenCLI Browser Bridge、MediaCrawler cookie/qrcode、redbook/xhs-cli/xiaohongshu-cli/XHS-Downloader 等登录态/cookie 方案用于小红书 intake。
+  - 小红书仅允许走公开分享页、公开 H5 API、无登录 Playwright/Jina、用户手动提供文本/截图/OCR 等路径。
+  - 账号主页、笔记列表、置顶内容、爆款笔记若无法通过公开 URL 直接取得，必须标记为信息不足，不得要求用户登录或读取本机浏览器 cookie。
 - **验收**：
   - Browser Bridge 扩展首次引导装完
   - 推特单条 + 推特线程各测 1 条入库
   - 知乎回答 + 知乎盐选各测 1 条入库
-  - 小红书笔记测 1 条入库
   - 登录态失效有明确提示
 - **派发模式**：🅱️ 施工模式（外部 Node.js 运行时 + 浏览器扩展，风险点多）
 - **状态**：✅ 已完成（骨架，commit `47e249c`，2026-04-21；Browser Bridge 扩展 + OpenCLI CLI 真调用验收待后续会话）
@@ -192,9 +195,29 @@ P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处
 - 状态：✅ 已完成（2026-04-22）
 
 ### P2-B: xhs_product Fetcher + dispatcher 扩展
-- 目标：识别 xhslink 短链 + 调 playwright-stealth 抓商品/店铺/主页页面
+- 目标：识别 xhslink 短链 + 调公开分享页 / H5 API / 无登录 Playwright 抓商品与店铺页面；账号主页不走登录态
 - 涉及文件：`skills/lark-knowledge-intake/xhs_product.py`（新建）、`skills/lark-knowledge-intake/dispatcher.py`（新建顶层分发器）
 - 状态：✅ 已完成（commit `9c218b2`）
+
+### P2-B2: 小红书商品免登录抓取方案（待升级）
+- 目标：把商品页免登录能力固化为 intake 主路径，替换当前误走 OpenCLI 登录态骨架的行为
+- GitHub 核对结论：
+  - 已见开源实现直接调用 `https://mall.xiaohongshu.com/api/store/jpd/edith/detail/h5/toc?version=0.0.5&item_id=<sku_id>`，读取 `descriptionH5`、`priceH5`、`sellerH5`、`carouselH5`、`graphicDetailsV4` 等公开 H5 数据。
+  - 已见开源实现把小红书商品详情定义为可用的稳定 Web surface，同时对未映射的签名 API 返回限制，不伪装成功。
+  - 搜索、用户主页、创作者/账号笔记类开源项目普遍依赖 `a1` / `web_session` / cookie / 二维码登录，不纳入本项目小红书 intake 路径。
+- 允许路径：
+  - 商品详情：公开 H5 API + 无登录 Playwright/Jina 兜底。
+  - 店铺基础画像与店铺商品矩阵：`sellerH5.link` / `/shop/{sellerId}` 公开店铺页。
+  - 详情图：公开图片 URL + 后续 OCR。
+- 禁止路径：
+  - 不使用 OpenCLI Browser Bridge 抓小红书。
+  - 不使用 MediaCrawler 的 `--lt cookie` / `--lt qrcode` 抓小红书。
+  - 不使用 redbook、xhs-cli、xiaohongshu-cli、XHS-Downloader 等依赖 cookie/二维码/浏览器登录态的路径做小红书 intake。
+  - 不读取用户本机 Chrome/Safari/Arc 等浏览器的小红书 cookie。
+- 验收：
+  - 给定 `goods-detail` URL，能免登录提取商品名、价格、销量、店铺名、店铺 URL、店铺粉丝、店铺已售、发货地、服务保障、主图 URL、详情图 URL。
+  - 若公开路径无法取得账号主页笔记/置顶/爆款内容，结果明确写“公开路径不足”，不提示登录。
+- 状态：⏸ 待启动
 
 ### P2-C: Intake 5维分析框架（全库通用）
 - 目标：所有内容 AI摘要 通过5维框架撰写，不限专题
