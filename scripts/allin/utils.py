@@ -24,13 +24,14 @@ def load_config() -> dict:
     return json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
 
 
-def safe_lark_run(cmd: list, action: str = "") -> dict | None:
+def safe_lark_run(cmd: list, action: str = "", cwd: str | None = None) -> dict | None:
     """
     执行 lark-cli 命令，统一处理错误。
     成功返回解析后的 dict；失败打印错误并返回 None。
     action: 用于错误信息的操作描述，如"读取收件表记录"
+    cwd: 工作目录（上传文件时需设为文件所在目录）
     """
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     try:
         data = json.loads(result.stdout)
         if data.get("ok"):

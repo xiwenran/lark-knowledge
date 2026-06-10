@@ -239,13 +239,14 @@ def build_html(segments: list, record: dict, analysis: dict, include_annotations
     template = TEMPLATE_HTML.read_text(encoding='utf-8')
 
     # 元数据
-    episode = record.get('期号', 'E???')
-    date = str(record.get('发布日期', ''))[:10]
-    duration = record.get('时长（分钟）', '?')
-    views = record.get('YouTube播放量', 0)
+    episode = record.get('期号') or 'E???'
+    date = str(record.get('发布日期') or '')[:10]
+    duration = record.get('时长（分钟）') or '?'
+    views = record.get('YouTube播放量') or 0
     views_wan = parse_views_wan(views)
-    topic = record.get('主题分类', '科技&AI')
-    cn_title = record.get('中文标题', '未知标题')
+    raw_topic = record.get('主题分类')
+    topic = (raw_topic[0] if isinstance(raw_topic, list) and raw_topic else raw_topic) or '科技&AI'
+    cn_title = record.get('中文标题') or '未知标题'
 
     # 五维分析
     five_dim_raw = (
@@ -335,10 +336,12 @@ def upload_pdf_to_drive(config: dict, pdf_path: Path) -> str:
     本身没有对应的网页 URL，必须额外调 create_share_link 生成真实分享链接。
     """
     folder_token = config.get("all_in_podcast", {}).get("pdf_folder_token", "")
-    cmd = ["lark-cli", "drive", "+upload", "--file", str(pdf_path)]
+    # lark-cli drive +upload 要求相对路径，必须在文件所在目录执行
+    cmd = ["lark-cli", "drive", "+upload", "--file", f"./{pdf_path.name}"]
     if folder_token:
         cmd += ["--folder-token", folder_token]
-    data = safe_lark_run(cmd, action=f"上传 {pdf_path.name}")
+    data = safe_lark_run(cmd, action=f"上传 {pdf_path.name}",
+                         cwd=str(pdf_path.parent))
     if not data:
         return ""
 
@@ -459,7 +462,7 @@ def main():
 
     print(f"[飞书] 读取收件表记录 {args.record_id}...")
     record = get_record(config, args.record_id)
-    episode = record.get('期号', 'E???')
+    episode = record.get('期号') or 'E???'
     cn_title = record.get('中文标题', '未知标题')
     print(f"       {episode} · {cn_title}")
 

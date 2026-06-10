@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <defs>
+    <linearGradient id="subtleWarm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7F3EC"/>
+      <stop offset="100%" stop-color="#F0EBE1"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1080" height="1350" fill="url(#subtleWarm)"/>
+  <rect width="1080" height="1350" filter="url(#grain)" opacity="0.02"/>
+
+  <!-- 左侧红线 -->
+  <rect x="0" y="0" width="5" height="1350" fill="#C0392B"/>
+
+  <!-- 页面标题 -->
+  <text id="page-title" x="80" y="120" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="56" font-weight="900" fill="#1A1A1A">本期最反直觉的判断</text>
+
+  <!-- 标题下红线 -->
+  <rect x="80" y="145" width="50" height="3" fill="#C0392B" rx="1.5"/>
+
+  <!-- 核心金句（红色大字） -->
+  <text id="highlight-quote" x="80" y="230" font-family="PingFang SC, Noto Sans SC, sans-serif" font-weight="700" fill="#C0392B">
+    <tspan font-size="38" x="80" dy="0">SpaceX收购Cursor不是为了订阅收入，</tspan>
+    <tspan font-size="38" x="80" dy="54">而是以编程工具为入口向企业输送算力。</tspan>
+  </text>
+
+  <!-- 正文段落 1 -->
+  <text id="body-1" x="80" y="390" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="32" font-weight="400" fill="#333333" letter-spacing="1">
+    <tspan x="80" dy="0">三大云厂商去年砸了2600亿美金搞算力，但AI</tspan>
+    <tspan x="80" dy="50">应用收入增速才40%。所有人第一反应：这不就</tspan>
+    <tspan x="80" dy="50">是泡沫吗？</tspan>
+  </text>
+
+  <!-- 正文段落 2（关键论点） -->
+  <text id="body-2" x="80" y="570" font-family="PingFang SC, Noto Sans SC, sans-serif" font-weight="700" fill="#1A1A1A">
+    <tspan font-size="32" x="80" dy="0">但他们说了一句话让我重新想了很久——</tspan>
+    <tspan font-size="36" x="80" dy="58" fill="#C0392B">"基础设施过剩的时候，</tspan>
+    <tspan font-size="36" x="80" dy="52" fill="#C0392B">恰好是护城河最宽的时候。"</tspan>
+  </text>
+
+  <!-- 正文段落 3 -->
+  <text id="body-3" x="80" y="790" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="32" font-weight="400" fill="#333333" letter-spacing="1">
+    <tspan x="80" dy="0">想想90年代铺光纤，当时也是所有人喊泡沫，</tspan>
+    <tspan x="80" dy="50">结果活下来那批公司后来垄断了整个云计算。</tspan>
+    <tspan x="80" dy="50">今天的算力军备竞赛，可能正在重复这件事。</tspan>
+  </text>
+
+  <!-- 正文段落 4（对你意味什么） -->
+  <text id="body-4" x="80" y="1000" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="32" font-weight="400" fill="#333333" letter-spacing="1">
+    <tspan x="80" dy="0" font-weight="700" fill="#1A1A1A">对你意味着什么：</tspan>
+    <tspan x="80" dy="50">如果你在创业，别只看"做什么应用"，想想</tspan>
+    <tspan x="80" dy="50">"谁控制了你的算力成本"——那才是真正的上游。</tspan>
+  </text>
+
+  <!-- 底部分隔线 -->
+  <line x1="80" y1="1270" x2="1000" y2="1270" stroke="#C0392B" stroke-width="0.5" opacity="0.15"/>
+
+  <!-- 底部信息 -->
+  <text id="footer-left" x="80" y="1310" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="14" font-weight="400" fill="#AAAAAA" letter-spacing="2">All In Podcast E270 · 中文知识库</text>
+  <text id="footer-right" x="1000" y="1310" font-family="PingFang SC, Noto Sans SC, sans-serif" font-size="18" font-weight="700" fill="#999999" text-anchor="end">2</text>
+</svg>
