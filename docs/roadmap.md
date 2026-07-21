@@ -2,512 +2,67 @@
 
 > 全项目规划文件,所有版本期都在此文件中。按 Echo「跨阶段项目规划必须物理化」规则维护。
 
-## 第一期 P1 — lint 升级 + Deep Research 接入(进行中)
-
-**触发**:2026-04-21 会话讨论。参考 nashsu/llm_wiki 的四信号关联算法与空白识别思路,决定偷学两样能力进 lark-knowledge:
-1. 现有 lark-knowledge-lint 扩展补链/聚类能力
-2. 新建 lark-knowledge-research skill,调 Tavily API 自动补空白
-
-**已砍掉**(用户本日拍板):Chrome 剪藏(Claude Code WebFetch 已够用)、lark-knowledge-intake 两步摄入升级(批量摄入一步够)。
-
-### P1-A:lark-knowledge-lint 加四信号补链算法
-- 目标:给现有 lint skill 加"未直接互链但内容相关"的补链建议能力
-- 涉及文件:`skills/lark-knowledge-lint/SKILL.md`、可能新增 `scripts/lark_lint/signals.py`
-- 算法参考:`~/Echo/scripts/obsidian_lint/signals.py`(直接链接 ×3.0、来源重叠 ×4.0、Adamic-Adar ×1.5、类型亲和 ×1.0)
-- 验收:在现有飞书知识库实跑,Top 20 补链建议能由用户肉眼判合理
-- 状态:✅ 已完成（commit `2073f44`）
-
-### P1-B:lark-knowledge-lint 加 Louvain 聚类 + 松散聚类识别
-- 目标:识别内聚度偏低的社区、孤岛页面
-- 涉及文件:`skills/lark-knowledge-lint/SKILL.md`、可能新增 `scripts/lark_lint/community.py`
-- 参数调优:Obsidian 端用内聚度 < 0.15 判松散;lark-knowledge 规模更大,阈值和 Top N 可能需要放宽(首跑后调)
-- 验收:松散聚类清单能指向真实的"没整理完"区块
-- 状态:✅ 已完成（commit `6408931`）
-
-### P1-C:新建 lark-knowledge-research skill 框架
-- 目标:搭骨架——触发词、默认路径、与 lint 的协作契约、草稿写回位置
-- 涉及文件:新建 `skills/lark-knowledge-research/SKILL.md`、`scripts/lark_research/` 目录
-- 触发词(建议):补空白 / Deep Research / 研究补漏
-- 与 lint 的协作:P1-B 产出的空白/松散聚类清单可作为 research 的输入
-- 验收:skill 可被触发,输出结构化的研究任务清单(尚未真跑 API)
-- 状态:✅ 已完成（commit `01a96d7`）
-
-### P1-D:research skill 接入 Tavily API
-- 目标:空白识别 → Tavily 搜索 → LLM 提炼 → 回写飞书草稿
-- 涉及文件:`skills/lark-knowledge-research/SKILL.md`、`scripts/lark_research/*.py`
-- 前置:用户已有 Tavily API 订阅,密钥走 env 变量不硬编码
-- 验收:针对一个真实空白主题,能产出可读的草稿写入飞书"待确认"区
-- 状态:✅ 已完成（commit `ee2d23e`）
-
-### P1-E:两个 skill 联动闭环
-- 目标:lint 扫出空白 → source_planner 生成资料来源计划 → research 批量补 → 用户确认后写入正式库
-- 涉及文件:两个 skill 的 SKILL.md 互相引用、新增 `scripts/lark_research/source_planner.py` 可选编排脚本
-- 搜索策略:飞书公共知识库 `site:docs.feishu.cn` 优先;官方信息补能力边界;行业资料补案例;Tavily 仅作为有额度时的可选加速,无额度不阻塞
-- 验收:一次"巡检 → 资料来源计划 → 研究 → 待确认草稿"可跑通;草稿必须列主来源/官方依据/行业补充/手工来源/未覆盖问题;不自动写正式知识库
-- 状态:🚧 进行中(P1-E 来源计划层已落地,完整 lint → research → 确认编排待做)
+**结构说明（2026-07-21 改造）**：本文件只保留「当前主线状态（按专项分组）+ 待确认区 + 未排期 + 已关闭索引」；判断项目现在走到哪一步只看本文件，不需要通读全文。每个专项的详细背景、决策过程、验收清单下沉到 `docs/roadmap/`（已关闭）与 `docs/roadmap/pending/`（待确认）子文件。**子文件不写新状态、不写新进度、不写下一步**——文中残留的 已完成/进行中/待启动 等状态记号只是下沉时的原文快照，判断当前状态只认本文件。
 
 ---
 
-## 本期依赖
+## 当前主线状态
 
-- 依赖 Obsidian 端 Echo v5.4-C 落地经验(networkx + python-louvain 验证过,可直接迁移)
-- 算法参考 `~/Echo/scripts/obsidian_lint/`,不重造轮子
-- lark-knowledge 规模大于 Obsidian,算法参数(Top N、聚类阈值)首跑后调优
-
-## 本期不做(用户本日明确砍掉)
-
-- Chrome 剪藏浏览器扩展——Claude Code 的 WebFetch 已经能读网页,不值得自建扩展
-- lark-knowledge-intake 两步思维链摄入——商业资产批量场景容错度比个人档案高,一步够用,两步是 Obsidian 端才需要的精度
+### [P1] lark-knowledge-lint × research 联动闭环（P1-E）  [详情 →](roadmap/lark-knowledge-p1-lint-research-close.md)
+- 当前阶段: P1-A~D（补链算法/聚类识别/research骨架/Tavily接入）均已完成；P1-E「lint扫空白→research批量补→用户确认写入正式库」完整闭环仍在打通
+- 一句话现状: 来源计划层（source_planner）已落地，完整编排（巡检→来源计划→研究→待确认草稿）尚未跑通
+- 阻塞: 原文未提及具体阻塞项
+- 最近验证: 原文未给出具体验证记录，仅说明"来源计划层已落地"
+- commit hash: 原文未提供（P1-A~D 各自有 hash，P1-E 本身未给出）
 
 ---
 
-## 第二期 P11 — 多源抓取器（✅ 已完成，2026-04-21）
+## 待确认区（等用户裁决：还在做 / 已关闭 / 废弃归档）
 
-> 说明：编号 P11 是历史决定，保留以对齐已有 commit（`47e249c` / `37d4339`）和 9 处引用（SKILL.md / fetchers/README.md / types.py / superpowers plan 等）。编号非连续不影响项目推进。
+### P11.4~P11.6 — 微信公众号/音视频转写/登录态社交平台抓取器  [原文快照 →](roadmap/pending/lark-knowledge-p11-4-5-6-unverified.md)
+- 缺什么: 三项均标注"✅ 已完成（骨架，commit `47e249c`）"，但原文各自明确写"真实扫码+抓取验收待后续会话""Get 笔记 API key 真调用验收待后续会话""Browser Bridge 扩展 + OpenCLI CLI 真调用验收待后续会话"，无法确认真机验收是否已发生
+- 待裁决: 这三项此后是否已经真实验收过？若已验收需补验证证据；若未验收，应转回「当前主线」或「未排期」
+- 建议: 回看后按实际情况二选一：已验收则补记录转已关闭；未验收则明确当前是否还打算推进
 
-整体分 6 期。依赖链：**P11.1（基础设施）→ P11.2-P11.6 按复杂度递进**。每期独立可派单，前序阶段不完成不能开下一期。图片类型不单独立期，走"附件入库 + 下游多模态直读"，不消耗 OCR 工期。
+### P2-A / P2-C / P2-D — 配置类三项（缺 commit hash）  [原文快照 →](roadmap/pending/lark-knowledge-p2-acd-missing-hash.md)
+- 缺什么: 三项均标"✅ 已完成（2026-04-22）"，但原文未给出 commit hash，无法写出「✅+hash+验证证据」的关闭行
+- 待裁决: 是否能从 git log 找到对应提交补齐 hash？若找不到，是否接受仅按日期确认关闭？
+- 建议: 若能定位到对应 commit，直接补 hash 转已关闭；找不到则维持待确认状态，不替用户猜测提交
 
-### P11.1 · 基础设施：分发器 + source_type 字段 + fetchers 骨架
-- **目标**：搭好路由架构，但不抓任何新内容。让任意 URL / 文件进入 intake 时能被正确识别类型，字段扩展就位
-- **涉及文件**：
-  - `~/lark-knowledge/config.json`（加 `source_type` 字段定义 + 枚举值）
-  - `~/.claude/skills/lark-knowledge-intake/SKILL.md`（引入 fetchers 模块说明）
-  - `~/.claude/skills/lark-knowledge-intake/fetchers/dispatcher.py`（新建，分发器核心）
-  - `~/.claude/skills/lark-knowledge-intake/fetchers/__init__.py`
-  - 飞书多维表格模板：手动加 source_type 字段
-- **验收**：
-  - dispatcher 给 10 个测试 URL + 3 个文件路径，正确返回 source_type 枚举
-  - 任何类型输入至少返回 `{source_type, url/file_path}` 不崩溃
-  - source_type 字段成功写入多维表格一条测试记录
-- **派发模式**：🅰️ 自主模式
-- **状态**：✅ 已完成（commit `47e249c`，2026-04-21）
+### P2-F — 端到端验收（3 测试链接跑完整流程）  [原文快照 →](roadmap/pending/lark-knowledge-p2f-e2e-acceptance.md)
+- 缺什么: 原文状态为「⏸ 待 P2-B 完成后执行」，而 P2-B 本身已标记完成（commit `9c218b2`），但未见 P2-F 是否已经启动或完成的记录
+- 待裁决: P2-B 已完成后，P2-F 端到端验收是否已经执行？
+- 建议: 若已执行，请补验证结果转已关闭；若未执行，转未排期或明确排期
 
-### P11.2 · 无状态网页类（article / paywall_news / fallback）
-- **目标**：公开网页 + 付费墙新闻能正文入库，fallback 链完整工作
-- **涉及文件**：
-  - `fetchers/article.py`（r.jina.ai / defuddle.md 调用）
-  - `fetchers/paywall.py`（Googlebot UA + X-Forwarded-For + Referer 伪装）
-  - `fetchers/archive.py`（Archive.today / Google Cache 降级）
-  - `fetchers/dispatcher.py`（级联逻辑接入）
-  - 配置：已知 paywall 域名列表（yaml）
-- **验收**：
-  - 10 个公开网页（blog / Substack 等）全部拿到 markdown 正文
-  - 3 个 paywall 站（NYT / WSJ / FT）至少 2 个能正文入库
-  - 故意给失效链接，fallback 能降级到 archive 拿到历史版本
-- **派发模式**：🅰️ 自主模式
-- **状态**：✅ 已完成（commit `47e249c`，2026-04-21）
+### P3-E — Kami PDF 排版模板 + 自动化脚本  [原文快照 →](roadmap/pending/lark-knowledge-p3e-kami-pdf.md)
+- 缺什么: 模板部分有 commit `427683a`，但「自动化脚本」部分原文只给日期（2026-04-29）未给 hash，两部分状态混在同一行「✅ 已完成」里，无法整体写出单一 hash 的关闭行
+- 待裁决: 自动化脚本部分是否有对应 commit？是否需要拆成两条分别关闭？
+- 建议: 若脚本 commit 可定位，拆成模板/脚本两条各自关闭；否则维持待确认
 
-### P11.3 · 文档附件（markitdown 全家桶）
-- **目标**：PDF / DOCX / PPTX / XLSX / EPUB / arxiv 统一转 markdown 入库
-- **涉及文件**：
-  - `fetchers/document.py`（markitdown 封装）
-  - `fetchers/arxiv.py`（识别 arxiv URL 走 PDF 路径）
-  - 依赖：`pip install markitdown`
-- **验收**：
-  - 每种扩展名至少一份真实样本转换成功
-  - arxiv 链接能自动下载 PDF 并转 md
-  - 大文件（>50MB PDF）有超时保护
-- **派发模式**：🅰️ 自主模式
-- **状态**：✅ 已完成（commit `47e249c`，2026-04-21）
+### P3-F — 精选 Top20 自动维护脚本  [原文快照 →](roadmap/pending/lark-knowledge-p3f-top20-updater.md)
+- 缺什么: 原文明确写「脚本完成（commit `5a67396`）；首跑验收待积累 ≥10 期真实数据后执行」，即验收本身尚未发生
+- 待裁决: 目前是否已积累 ≥10 期数据并完成首跑验收？
+- 建议: 若已满足数据量并首跑过，补验证结果转已关闭；若数据量仍不够，转未排期（等数据积累）
 
-### P11.4 · 微信公众号（Playwright 登录态）
-- **目标**：公众号长文 URL 能全文入库，扫码登录态走 `.local`
-- **涉及文件**：
-  - `fetchers/wechat.py`（Playwright 封装 或 `wexin-read-mcp` 集成）
-  - `~/.claude/skills/lark-knowledge-intake/.local/wechat_cookie.json`（gitignore）
-  - `.gitignore`（确认 `.local/` 已排除）
-  - SKILL.md：加首次使用时的扫码引导段
-- **验收**：
-  - 首次运行弹扫码，登录后 cookie 持久化
-  - 3 篇不同公众号长文（含图片、代码块）正文入库
-  - cookie 过期时有明确错误提示，引导重新扫码
-- **派发模式**：🅱️ 施工模式（登录态管理是高风险点，Opus 主导设计 `.local` 机制后 Codex 施工）
-- **状态**：✅ 已完成（骨架，commit `47e249c`，2026-04-21；真实扫码+抓取验收待后续会话）
-
-### P11.5 · 音视频转写（Get 笔记 API）
-- **目标**：B 站 / 小宇宙 / 喜马拉雅 / YouTube 视频能转写入库
-- **涉及文件**：
-  - `fetchers/transcript.py`（Get 笔记 API 封装）
-  - `~/.claude/skills/lark-knowledge-intake/.local/getnote_api_key`（用户输入）
-  - 配置：Get 笔记支持的平台域名白名单
-- **验收**：
-  - B 站视频 + 小宇宙播客 + 喜马拉雅各测 1 条，逐字稿入库
-  - YouTube 如 Get 笔记支持则过；不支持则标 `source_type=fetch_failed` 加降级 TODO
-  - 转写时间戳信息保留在 meta 字段
-- **派发模式**：🅰️ 自主模式
-- **启动前需用户确认**：Get 笔记 API 费率 / 稳定性
-- **状态**：✅ 已完成（骨架，commit `47e249c`，2026-04-21；Get 笔记 API key 真调用验收待后续会话）
-
-### P11.6 · 登录态社交平台（OpenCLI 适配器，不含小红书）
-- **目标**：推特 / 知乎偶发归档能拿到正文；小红书不得走登录态抓取
-- **涉及文件**：
-  - `fetchers/opencli_bridge.py`（OpenCLI CLI 调用封装）
-  - SKILL.md：Browser Bridge 扩展安装引导段
-  - `~/.claude/skills/lark-knowledge-intake/.local/opencli_config/`
-- **小红书禁令**：
-  - 禁止把 OpenCLI Browser Bridge、MediaCrawler cookie/qrcode、redbook/xhs-cli/xiaohongshu-cli/XHS-Downloader 等登录态/cookie 方案用于小红书 intake。
-  - 小红书仅允许走公开分享页、公开 H5 API、无登录 Playwright/Jina、用户手动提供文本/截图/OCR 等路径。
-  - 账号主页、笔记列表、置顶内容、爆款笔记若无法通过公开 URL 直接取得，必须标记为信息不足，不得要求用户登录或读取本机浏览器 cookie。
-- **验收**：
-  - Browser Bridge 扩展首次引导装完
-  - 推特单条 + 推特线程各测 1 条入库
-  - 知乎回答 + 知乎盐选各测 1 条入库
-  - 登录态失效有明确提示
-- **派发模式**：🅱️ 施工模式（外部 Node.js 运行时 + 浏览器扩展，风险点多）
-- **状态**：✅ 已完成（骨架，commit `47e249c`，2026-04-21；Browser Bridge 扩展 + OpenCLI CLI 真调用验收待后续会话）
-
-### 整体验收
-- intake skill 接到任意 URL / 文件，都能给出结构化入库结果（成功或 `fetch_failed` 带链接保留）
-- 现有 5 个 skill 对外接口无破坏，原有流程不受影响
-- `.local/` 目录零凭据入仓，git log 历史提交无敏感泄露
-
-### 依赖与顺序约束
-- P11.2 / P11.3 可并行（无状态、无依赖）
-- P11.4 / P11.5 / P11.6 均依赖 P11.1
-- P11.4 / P11.5 / P11.6 互不依赖，可按用户优先级拉动
-- 图片类型不单独立期，走附件入库，由下游多模态模型直读
-
-### 对抗性审查修复（2026-04-22，commit `37d4339`）
-
-P11 全期落地后走 `/codex:adversarial-review`，Codex 发现并修复 3 处 dispatcher 安全/逻辑问题：
-
-| # | 级别 | 问题 | 修法 |
-|---|---|---|---|
-| 1 | 🔴 HIGH | fallback 分支把非 URL 自由文本外发到 r.jina.ai / archive.today（数据外泄风险） | `dispatch()` fallback 加 `_is_http_url` 门，非 URL 直接返回本地校验错误 |
-| 2 | 🔴 HIGH | `https://host/file.pdf` 远程 URL 被当本地路径送给 markitdown（必然失败） | doc 分支判 `_is_http_url`，远程先 `_download_remote_document()` 到临时文件再转，finally 清理 |
-| 3 | 🟡 MEDIUM | dispatcher 用 `OPENCLI_CONFIG_PATH.is_file()` 前置门，绕过 bridge 的 PATH 发现能力 | 去掉前置门，bridge 自己按「配置文件 → PATH → 未配置错误」三档决定 |
-
-新增 3 条回归测试（`test_dispatch_rejects_non_url_fallback_input_locally` / `test_dispatch_downloads_remote_document_url_before_conversion` / `test_dispatch_routes_social_urls_through_opencli_bridge`），41/41 通过。
+### P3-G — 逐字稿流水线重构（多模型分工 + 质量合同）  [原文快照 →](roadmap/pending/lark-knowledge-p3g-pipeline-rewrite.md)
+- 缺什么: 原文写「✅ 脚本开发完成（2026-04-29）」，但明确列出「待验收：E271 真实运行跑通全流程」，即端到端真实运行验收尚未完成
+- 待裁决: E271（或其后任一期）是否已经用新流水线真实跑通全流程？
+- 建议: 若已跑通，补验证证据（实际消耗 token 数、格式核对结果）转已关闭；若未跑通，明确当前是否仍在用旧流水线生产
 
 ---
 
-## 第三期 P2 — 小红书虚拟产品分析模块（进行中）
+## 未排期
 
-**触发**：2026-04-22 会话。新增第4个专题"小红书虚拟产品"，核心是引入**商业洞察5维框架**作为整个知识库的底层分析逻辑。
-
-**架构决策**：5维框架（产品形态/流量转化/赛道竞争/操盘手画像/机会洞察）适用于所有内容——商品链接、文章、精华帖均通过此框架分析。所有知识库成品页和视角提炼页统一使用5维章节结构。
-
-### P2-A: 配置与 wiki 目录
-- 目标：新增专题/资产形态/source_type，飞书 wiki 子目录上线
-- 涉及文件：`~/.agents/skills/lark-knowledge-config/config.json`
-- 变更：新增专题"小红书虚拟产品"、资产形态"商品调研"/"赛道分析"、source_type xhs_product/xhs_shop/xhs_profile
-- wiki 节点：04_小红书虚拟产品（`S4kqwctcFiPIlQkHcbUcUjSGnpg`）/ 01_竞品案例（`T86Bw4KpciQFHikwUdncSTpXnv2`）/ 02_赛道分析（`IKTxwoR4HimnV9k3ZBCc4Xv1ned`）
-- 状态：✅ 已完成（2026-04-22）
-
-### P2-B: xhs_product Fetcher + dispatcher 扩展
-- 目标：识别 xhslink 短链 + 调公开分享页 / H5 API / 无登录 Playwright 抓商品与店铺页面；账号主页不走登录态
-- 涉及文件：`skills/lark-knowledge-intake/xhs_product.py`（新建）、`skills/lark-knowledge-intake/dispatcher.py`（新建顶层分发器）
-- 状态：✅ 已完成（commit `9c218b2`）
-
-### P2-B2: 小红书商品免登录抓取方案（待升级）
-- 目标：把商品页免登录能力固化为 intake 主路径，替换当前误走 OpenCLI 登录态骨架的行为
-- GitHub 核对结论：
-  - 已见开源实现直接调用 `https://mall.xiaohongshu.com/api/store/jpd/edith/detail/h5/toc?version=0.0.5&item_id=<sku_id>`，读取 `descriptionH5`、`priceH5`、`sellerH5`、`carouselH5`、`graphicDetailsV4` 等公开 H5 数据。
-  - 已见开源实现把小红书商品详情定义为可用的稳定 Web surface，同时对未映射的签名 API 返回限制，不伪装成功。
-  - 搜索、用户主页、创作者/账号笔记类开源项目普遍依赖 `a1` / `web_session` / cookie / 二维码登录，不纳入本项目小红书 intake 路径。
-- 允许路径：
-  - 商品详情：公开 H5 API + 无登录 Playwright/Jina 兜底。
-  - 店铺基础画像与店铺商品矩阵：`sellerH5.link` / `/shop/{sellerId}` 公开店铺页。
-  - 详情图：公开图片 URL + 内部 OCR 处理；升级成品页不得暴露 OCR/抓取过程。
-- 禁止路径：
-  - 不使用 OpenCLI Browser Bridge 抓小红书。
-  - 不使用 MediaCrawler 的 `--lt cookie` / `--lt qrcode` 抓小红书。
-  - 不使用 redbook、xhs-cli、xiaohongshu-cli、XHS-Downloader 等依赖 cookie/二维码/浏览器登录态的路径做小红书 intake。
-  - 不读取用户本机 Chrome/Safari/Arc 等浏览器的小红书 cookie。
-- 验收：
-  - 给定 `goods-detail` URL，能免登录提取商品名、价格、销量、店铺名、店铺 URL、店铺粉丝、店铺已售、发货地、服务保障、主图 URL、详情图 URL。
-  - 若公开路径无法取得账号主页笔记/置顶/爆款内容，只写入内部备注/meta，不提示登录，也不在成品页生成“信息缺口”章节。
-- 状态：⏸ 待启动
-
-### P2-C: Intake 5维分析框架（全库通用）
-- 目标：所有内容 AI摘要 通过5维框架撰写，不限专题
-- 涉及文件：`skills/lark-knowledge-intake/SKILL.md`
-- 状态：✅ 已完成（2026-04-22）
-
-### P2-D: Upgrade 5维章节结构（全库通用）
-- 目标：所有资产形态成品页/视角提炼页统一使用5维章节结构，替换原有按资产形态分列的模板
-- 涉及文件：`skills/lark-knowledge-upgrade/SKILL.md`
-- 状态：✅ 已完成（2026-04-22）
-
-### P2-E: 赛道分析自动汇总（未来）
-- 目标：积累到一定数量的商品调研记录后，自动汇总生成赛道分析页
-- 状态：⏸ 待规划（P3 考虑）
-
-### P2-F: 端到端验收
-- 目标：用3个测试链接跑完整流程（商品/店铺/主页各1个）
-- 状态：⏸ 待 P2-B 完成后执行
+- P2-B2 — 小红书商品免登录抓取方案（待升级） ⏸ 待启动：把商品页免登录能力固化为 intake 主路径，替换当前误走 OpenCLI 登录态骨架的行为
+- P2-E — 赛道分析自动汇总 ⏸ 待规划（P3 考虑）：积累到一定数量的商品调研记录后，自动汇总生成赛道分析页
 
 ---
 
-## 第四期 P3 — All In Podcast 中文知识库产品
+## 已关闭
 
-**触发**：2026-04-28 会话。基于现有 lark-knowledge 生产线，新建独立飞书知识库空间，把 All In Podcast（硅谷顶级 VC 播客，107 万订阅）翻译、分析、结构化，做成三层付费知识库产品在小红书售卖。
-
-**三层产品**：
-1. 手绘笔记（Sketchnote，免费引流）
-2. 中英对照逐字稿 原稿版（基础付费）
-3. 含五维分析注释的 注释版（高级付费）
-两个付费版均配 Kami 可打印 PDF。
-
-**方案文档**：`~/Obsidian/PersonalWiki/方案/all-in-podcast-知识库产品.md`
-
-**飞书基础设施**：
-- Base（节目收件表）：base_token `<见 config.json>`，table_id `<见 config.json>`
-- Wiki 空间：space_id `<见 config.json>`，根节点 `<见 config.json>`
-- 知识库目录：导航总表 / 精选必读 / 科技&AI / 全球视野 / 金融&市场 / 商业&创业 / 人物专访（各含 2024/2025 子节点）
-- 完整 ID 索引：`memory/reference_allinpodcast_ids.md`
-
-### P3-A: 飞书基础设施搭建
-- 目标：多维表格（17 字段）+ wiki 知识库目录结构就位，ID 入 config
-- 涉及文件：`~/.agents/skills/lark-knowledge-config/config.json`、`memory/reference_allinpodcast_ids.md`
-- 验收：表格 17 字段齐全（含综合得分公式）、6 大主题 + 2024/2025 子节点全部可访问
-- 状态：✅ 已完成（commit `57e06f1`，2026-04-28）
-
-### P3-B: All In 收件 Skill（YouTube 视频摘要入表）
-- 目标：给定 YouTube 链接，自动提取标题/发布日期/播放量 + AI 生成五维分析摘要，写入节目收件表
-- 涉及文件：新建 `skills/lark-knowledge-allin-intake/SKILL.md`
-- 四段式流水线：Worker Sonnet 4.6（结构提取）→ Haiku 4.5（关键段校对）→ Writer Sonnet 4.6（五维分析撰写）→ 冷眼 Sonnet 4.6（审查）
-- 五维框架：①议题背景 ②论点链 ③市场判断 ④四人立场 ⑤国内启示
-- 验收：用 1 期真实 YouTube 链接跑完，收件表新增 1 条记录，五维摘要可读
-- 状态：✅ 已完成（commit `6ea0e2d`，2026-04-28）
-
-### P3-C: All In 逐字稿生成（中英对照排版）
-- 目标：从 YouTube 字幕拉取原文，AI 翻译为中文，按「中文段落 + EN: 英文原文」格式排版，写入飞书知识库页面
-- 涉及文件：新建 `skills/lark-knowledge-allin-transcript/SKILL.md`
-- 排版规则：天蓝色标题、灰色 EN: 前缀、light-blue callout 作注释（有实质洞察才写）
-- 验收：1 期逐字稿完整写入飞书页面，格式符合方案文档规范
-- 状态：✅ 已完成（commit 4f51a00，2026-04-28）
-
-### P3-D: All In 注释版生成（内联注释 + 五维分析章节）
-- 目标：在逐字稿基础上，由 AI 添加内联注释 callout + 独立五维分析章节
-- 涉及文件：`skills/lark-knowledge-allin-transcript/SKILL.md`（扩展注释逻辑）
-- 注释标准：只在「数据/判断/公司名需要背景」处添加，不注水
-- 验收：1 期注释版完整写入飞书页面，注释质量通过人工审查
-- 状态：✅ 已合并进 P3-C（commit `4f51a00`，2026-04-28）
-  - P3-C skill 的 Step 4（Writer 添加注释）和 Step 5B（独立五维章节）已覆盖本期全部内容
-
-### P3-E: Kami PDF 排版模板 + 自动化脚本
-- 目标：用 Kami（HTML/CSS）生成可打印 PDF，主副式双语，霞鹜文楷，天蓝色 #4DABF7
-- 涉及文件：`templates/allin-kami/`、`scripts/allin/generate_pdf.py`
-- 验收：1 期 PDF 导出，双语对照排版，可在 Kami 中标注
-- 状态：✅ 已完成（模板 commit `427683a`，自动化脚本 2026-04-29）
-  - `templates/allin-kami/styles.css`：霞鹜文楷 + #4DABF7 天蓝色全套样式
-  - `templates/allin-kami/episode.html`：封面/概览/五维/金句/逐字稿完整模板
-  - `scripts/allin/generate_pdf.py`：读 bilingual.json + analysis.json，Chrome headless 生成 PDF
-  - 同时输出注释版（annotated）和原稿版（original）两份
-
-### P3-F: 精选 Top20 自动维护
-- 目标：每月由 AI 根据「播放量×0.4 + 五维评分×0.6」算法自动更新「精选必读」页面
-- 涉及文件：`scripts/allin_top20_updater.py`（新建）
-- 验收：脚本跑通，精选必读页面内容自动刷新
-- 状态：✅ 脚本完成（commit `5a67396`，2026-04-28）；首跑验收待积累 ≥10 期真实数据后执行
-
-### P3-G: 逐字稿流水线重构（多模型分工 + 质量合同）
-- 目标：用火山引擎 Doubao-Seed-2.0-pro 替换全文 Claude 翻译，引入异常检测器，重构 P3-C 逐字稿生成流水线，将 Claude token 消耗降低约 90%
-- 触发：2026-04-29 复盘，发现原流水线全程用 Claude Sonnet × 5 agent，约 50 万 token/期，成本高、session 易被 context compaction 中断导致结果丢失
-- 涉及文件：
-  - `scripts/allin/vtt_clean.py`（新建：VTT 去重 + 分段）
-  - `scripts/allin/translate_bilingual.py`（新建：调 Doubao API 出逐句双语稿）
-  - `scripts/allin/build_feishu_page.py`（新建：组装页面 + 调 Claude 注释/分析）
-  - `skills/lark-knowledge-allin-transcript/SKILL.md`（更新：模型分工 + 质量合同）
-  - `skills/lark-knowledge-allin-intake/SKILL.md`（更新：Worker 改用 Doubao）
-
----
-
-#### 新流水线架构
-
-```
-VTT字幕原文
-  ↓ [vtt_clean.py — 零成本]
-去重 + 分段（保留时间戳）
-  ↓ [Doubao-Seed-2.0-pro — 极低成本]
-逐句双语翻译（EN↔CN，说话人标注）
-  ↓ [Claude Haiku — 低成本]
-事实核查：数字/人名/说话人归属 → 中文异常报告
-  ↓ [用户确认 — 5分钟，中文决策]
-  ↓ [Claude Sonnet — 中等成本]
-注释生成 + 五维分析终稿 + 精华金句
-  ↓ [Claude Opus — 单次短调用]
-异常检测（世界知识 + 内部一致性）→ 中文报告
-  ↓ [用户确认 — 1分钟]
-  ↓ [lark-cli — 零成本]
-写入飞书 Wiki + 回填收件表
-```
-
-#### 各模型职责与选型理由
-
-| 角色 | 模型 | 职责 | 选型理由 |
-|------|------|------|---------|
-| 翻译 Worker | Doubao-Seed-2.0-pro | 字幕全文逐句翻译 | 英文 STEM 理解最强，成本约为 Claude 的 1/10 |
-| 事实校对 | Claude Haiku | 核查数字/人名/归属，输出中文报告 | 机械比对任务，轻量快速；Doubao 英文细节不如 Claude 系列稳 |
-| 内容生产 | Claude Sonnet | 注释 + 五维分析 + 金句 | 推理和洞察，Claude 的核心价值所在 |
-| 异常检测 | Claude Opus | 世界知识核验 + 内部一致性检查 | 对4位主播公开立场知识最深，单次短调用值得用最强模型 |
-| 写入 | lark-cli | 飞书 Wiki + 收件表回填 | 不变 |
-
-#### 质量合同（所有 Agent 共享）
-
-所有 Agent 在任务前读取同一份规范，避免主观标准漂移：
-
-**可验证事实标准（Haiku 负责）：**
-- 数字：必须能在字幕原文找到出处，否则标❓
-- 人名归属：Jason 说的 ≠ Chamath 说的，错了就是错了
-- 公司名：英文原名保留，括号加中文
-
-**五维分析结构标准（机械检查）：**
-- 五维①-⑤ 是否都有 → 数数
-- 总字数是否 150-250 字 → 统计
-- ⑤国内启示是否出现中国公司/政策名词 → 关键词检查
-
-**各角色权力边界：**
-- Haiku：只能标❓，不能改内容
-- Writer (Sonnet)：定稿权，但必须回应每个❓
-- 异常检测 (Opus)：只输出"⚠️需关注"或"✅未发现异常"，不推翻 Sonnet 的风格判断
-
-#### 被否决的方案及原因
-
-| 方案 | 否决原因 |
-|------|---------|
-| ❌ 冷眼做主观质量审查 | 不同模型对"好"的定义不同，无法收敛，产生沉默的内耗（选贤陷阱） |
-| ❌ 引入质量合同但保留主观冷眼 | 合同能解决结构检查，解决不了主观判断分歧，根本矛盾未消除 |
-| ❌ 把质量判断完全交给用户 | 用户不懂英文，验证链断在能力边界处 |
-| ❌ 彻底去掉外部视角 | 丢失交叉检查价值；问题是职责定义错了，不是角色多余 |
-| ❌ 全程用 Claude（原方案） | 约 50 万 token/期，session 易中断，成本不可持续 |
-| ❌ llm-subtrans 工具 | 需要额外依赖，直接调 Doubao API 更简洁，控制更精确 |
-
-#### 逐字稿格式规范更新
-
-原格式（已废弃）：
-```
-<大段 EN 灰色块>
-中文翻译段落...
-```
-
-新格式（逐句对照，紧凑）：
-```
-**[时间] 章节标题**
-
-> **Jason**: 英文原句
-**Jason**：中文翻译
-
-> **Chamath**: 英文原句
-**Chamath**：中文翻译
-
-<callout background-color="light-blue">有实质洞察时才加</callout>
-```
-
-- 验收：E271 起用新流水线跑通，单期 Claude 消耗 ≤ 5000 token，逐字稿格式符合新规范
-- 状态：✅ 脚本开发完成（2026-04-29）
-  - `scripts/allin/vtt_clean.py`：VTT 去重 + 分段，已测试 E270（6段 354句）
-  - `scripts/allin/translate_bilingual.py`：调 Doubao API，支持断点续传，已测试 E270（~87KB 输出，约2分钟）
-  - `scripts/allin/build_feishu_page.py`：组装页面，读取 analysis.json，dry-run 验证通过（102KB）
-  - `scripts/allin/run_episode.sh`：一键运行脚本，串联全流程
-  - `skills/lark-knowledge-allin-transcript/SKILL.md`：更新至 v2.0，新增多模型分工、质量合同、格式规范
-  - 待验收：E271 真实运行跑通全流程（Claude AI 分析步骤需在主会话执行）
-- API 配置：火山引擎 ARK，Base URL `https://ark.cn-beijing.volces.com/api/coding/v3`，Model `doubao-seed-2.0-pro`
-
-### P3-H: 产品拆解笔记生成（upgrade Step 7）
-- 目标：对产品分析页面生成 4 张手绘拆解图，用于小红书发布引流
-- 涉及文件：`skills/lark-knowledge-upgrade/SKILL.md`（新增 Step 7）、`scripts/shared/gen_image.py`（新增共享图片生成工具）
-- 4 张图：封面 / 商业模式拆解 / 流量拆解 / 机会拆解
-- 复用 All In 手绘笔记视觉风格
-- 状态：✅ 已完成（commit `2f0a525`，2026-05-06）
-
-### P3-I: 小红书笔记撰写 Skill
-- 目标：新建独立 Skill，根据飞书知识库页面内容自动撰写小红书笔记（无独立标题，首段 ≤30 字即标题预览、正文 ≤300 字、5-10 个话题标签）
-- 涉及文件：新建 `skills/lark-knowledge-xhs-note/SKILL.md`
-- 触发词：`/小红书笔记`
-- 写作风格：口语化、具体数字、简单直接、举例驱动、结果感强
-- 三种内容类型自动区分：🔍 商品拆解型 / 💡 行业洞察型 / 📝 经验分享型
-- 配图统一输出到 `~/Downloads/AllInPodcast/<期号>_<主题>/` 子文件夹
-- 首段与正文之间增加过渡句，避免跳跃感
-- 状态：✅ 已完成（commits `cfdbaac` → `71bb01d`，2026-05-06）
-
-### P3-J: gen_image.py 代码修复
-- 目标：修复冷眼审查发现的两个瑕疵（import time 位置 + 配置路径统一）
-- 涉及文件：`scripts/shared/gen_image.py`
-- 状态：✅ 已完成（commit `cfdbaac`，2026-05-06）
-
----
-
-### P3-K: 视觉系统升级（V2 概念海报体系）
-
-**触发**：2026-05-07 会话。用户在 E270 期临时验证后确认方向。原 sketchnote 信息图风格（黑线+天蓝色图标）不够吸引小红书用户；PDF 在 iPhone fit-width 显示时文字偏小。临时脚本散在 /tmp，需规范化进 Skill 体系。
-
-**整体状态**：✅ 已完成（K1–K6 全部交付，2026-05-07，commit `c605835`）
-
-#### P3-K1: PDF 排版手机优化
-
-- 目标：A4 PDF 在 iPhone fit-width 缩放约 36% 后，屏幕显示文字 ≥12px 舒适可读
-- 涉及文件：`templates/allin-kami/styles.css`
-- 核心改动：body 14px→18px，章节标题 22px，英文/翻译 16px，封面标题 38px，页边距 `@page { margin: 10mm 12mm }`，内容 padding 32px 20px
-- 设计原理：A4→iPhone fit-width 缩放约 36%，源 PDF 需 18px 以上才能保证屏幕 ≥12px
-- 派发模式：Opus 自做（≤10 行字号值修改，已完成）
-- 验收：iPhone Safari fit-width 打开 E270 PDF，正文清晰可读，无需放大
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
-
-#### P3-K2: 手绘笔记 V2 模板系统
-
-- 目标：替换原 sketchnote 风格为「手绘高级概念海报」体系，封面+内页双模板，视觉语言更适合小红书引流
-- 涉及文件：`scripts/allin/generate_sketchnote.py`（重写 `build_page_prompts()`）
-- 新封面模板（cover_v2）核心要素：
-  - 巨型核心词（毛笔/书法/剪纸艺术化处理，占 40–60% 面积）
-  - 1–2 个微小角色或物体演绎词义（视觉隐喻）
-  - 嵌入式封面信息（不分栏）：系列名、期号日期时长播放量、主题分类、副标题、三个核心议题印章、四主播署名、1–2 句诗性补白
-  - 质感：手绘水彩+剪纸拼贴+石版印刷+宣纸颗粒
-  - 严禁：分栏拼接、群像、英文界面元素、错字
-- 新内页模板（inner_v2）核心要素：
-  - 顶部巨型章节标题（毛笔字，占 15–20% 高度）
-  - 核心隐喻母题贯穿全页（每个五维章节有专属母题，3 个要点「附着」在母题上，不做分栏卡片）
-  - 底部金句或印章注解 + 系列标识
-- 配色二元体系：
-  - 亮色 A（轻盈派，默认）：粉蓝 #4A90E2 + 暖黄 #F5C842 + 米白 #F8F4ED
-  - 亮色 B（清新派）：薄荷青 #5DA68F + 杏粉 #E8B197 + 米白
-  - 深色 C（东方庄重派，重型题材备选）：朱红 #C73E2C + 墨黑 #1A1A1A + 米黄宣纸 #F5F2EA + 暖金 #C8A35F
-  - 深色 D（藏青现代派）：藏青 #1B365D + 暖金 #C8A35F + 米白 + 朱砂红印章
-  - 每期由主会话根据议题气质选定色组（默认亮色 A/B，重型变革/危机题材走深色 C/D）
-- 派发模式：🅱️ 施工模式（Opus 已定完整方案，Codex 按方案改写 `build_page_prompts()`）
-- 验收：用 E270 重生 5 张图，封面符合 cover_v2 要素，4 张内页符合 inner_v2 要素，配色属于同一色组
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
-
-#### P3-K3: Codex 优先生图链路修复
-
-- 目标：补齐 SKILL.md Step 10 承诺的「Codex 优先生图 → API fallback」链路（当前脚本实际只调 OpenAI API）
-- 涉及文件：`scripts/allin/generate_sketchnote.py`、`skills/lark-knowledge-allin-transcript/SKILL.md`
-- 关键改动：新增 `generate_via_codex()` 函数，用 codex-companion task 派子代理生图；改 `generate_image()` 为 Codex 优先 + 配置 IMAGE_API_KEY 时 API fallback
-- 派发模式：🅰️ 自主模式（Codex 自己读 SKILL.md 设计 fallback 链，不需要 Opus 预读代码）
-- 验收：默认走 Codex 子代理生图；配置 IMAGE_API_KEY 环境变量时才走 API；SKILL.md 描述与实际一致
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
-
-#### P3-K4: 子代理并发生成（5 张并行）
-
-- 目标：5 张手绘笔记从当前串行约 7 分钟（每张 80–90s）降到 2–3 分钟
-- 涉及文件：`scripts/allin/generate_sketchnote.py`
-- 实现思路：asyncio 或 threading.ThreadPoolExecutor，5 任务并发，统一收集结果
-- 派发模式：🅰️ 自主模式
-- 验收：5 张图并发生成，总耗时 ≤ 单张最长耗时 × 1.5
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
-
-#### P3-K5: 商品拆解图（P3-H）按 V2 规范同步
-
-- 目标：`scripts/shared/gen_image.py` 当前用旧 sketchnote 提示词，需升级到 V2 双模板（4 张图：封面 cover_v2 + 3 张内容图 inner_v2）
-- 涉及文件：`scripts/shared/gen_image.py`、`skills/lark-knowledge-upgrade/SKILL.md`（同步 Step 7 描述）
-- 关键设计：与 `generate_sketchnote.py` 共享配色矩阵和模板生成逻辑（统一从 `scripts/shared/poster_template.py` 导入，见 K6）
-- 派发模式：🅱️ 施工模式（方案已定，Codex 按方案改写）
-- 验收：商品拆解 4 张图（封面+商业模式拆解+流量拆解+机会拆解）均符合 V2 规范，与 All In 手绘笔记视觉语言一致
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
-
-#### P3-K6: 提示词宪法（参数化模板固化）
-
-- 目标：把封面 V2（cover_v2）和内页 V2（inner_v2）已验证的 prompt 抽象成参数化模板，存进 `scripts/shared/poster_template.py`，供 K2/K5 import 使用；解决每次新会话重写 prompt 导致风格漂移的问题
-- 涉及文件：
-  - `scripts/shared/poster_template.py`（新建）：包含 `COVER_V2_TEMPLATE`、`INNER_V2_TEMPLATE` 两个常量，以及 `render_cover_prompt(params)`、`render_inner_prompt(params)` 两个渲染函数
-  - `scripts/allin/generate_sketchnote.py`（K2 完成后改造）：从 poster_template import，不再内联定义 prompt
-  - `scripts/shared/gen_image.py`（K5 完成后改造）：同上
-- 派发模式：🅱️ 施工模式（施工说明书 skill-allin-upgrade.md 第 5 章已完整指定模板内容和参数清单）
-- 验收：
-  - `scripts/shared/poster_template.py` 文件存在，包含两个模板常量和两个渲染函数
-  - 模板字符串保留全部方法论骨架（风格基底 / 版面原则 / 严禁列表）
-  - 所有可变参数都以 `{参数名}` 形式提取，覆盖封面 15 个参数、内页 8 个参数
-  - E271 新一期套用模板，只填参数，无需任何 prompt 重写
-  - 同一期数据二次调用模板，输出 prompt 完全一致（幂等）
-- 状态：✅ 已完成（commit `c605835`，2026-05-07）
+- lark-knowledge-lint 四信号补链 + Louvain 聚类识别 + research skill 骨架 + Tavily API 接入（P1-A/B/C/D） ✅ `2073f44`/`6408931`/`01a96d7`/`ee2d23e` — 验证: 现有飞书知识库实跑，Top 20 补链建议人工判合理；松散聚类清单可用；research skill 骨架可触发并输出结构化任务清单；针对真实空白主题产出可读草稿写入飞书待确认区 [详情 →](roadmap/lark-knowledge-p1-lint-research-close.md)
+- P11 多源抓取器基础设施 + 无状态网页 + 文档附件 + 对抗性审查修复 ✅ `47e249c`/`37d4339` — 验证: dispatcher 对 10 URL+3 文件正确分发；10 个公开网页全部拿到正文，3 个 paywall 站至少 2 个正文入库；PDF/DOCX/PPTX/XLSX/EPUB/arxiv 各扩展名样本转换成功；对抗性审查发现 3 处安全/逻辑问题（2 高 1 中）修复后新增 3 条回归测试，41/41 通过 [详情 →](roadmap/lark-knowledge-p11-fetchers-core.md)
+- P2-B xhs_product Fetcher + dispatcher 顶层扩展 ✅ `9c218b2` — 验证: 识别 xhslink 短链，公开分享页/H5 API/无登录 Playwright 抓商品与店铺页面，账号主页不走登录态（原文未给出具体测试用例数量，仅标记完成） [详情 →](roadmap/lark-knowledge-p2b-xhs-fetcher.md)
+- All In Podcast 飞书基础设施 + 收件 Skill + 逐字稿双语排版 + 内联注释（P3-A/B/C/D） ✅ `57e06f1`/`6ea0e2d`/`4f51a00` — 验证: 飞书多维表格 17 字段齐全、6 大主题+2024/2025 子节点全部可访问；1 期真实 YouTube 链接跑通收件表新增记录；1 期逐字稿完整写入飞书页面，格式符合方案文档规范，注释与独立五维分析章节已覆盖 [详情 →](roadmap/lark-knowledge-p3-allin-core-pipeline.md)
+- All In 商品拆解图（P3-H）+ 小红书笔记撰写 Skill（P3-I）+ gen_image.py 修复（P3-J） ✅ `2f0a525`/`cfdbaac`→`71bb01d` — 验证: 4 张手绘拆解图（封面/商业模式/流量/机会）完成；小红书笔记撰写 skill 完成，触发词 `/小红书笔记` 可用；冷眼审查发现的 import time 位置与配置路径两处瑕疵已修复 [详情 →](roadmap/lark-knowledge-p3-xhs-note-skill.md)
+- All In 视觉系统 V2（P3-K1~K6：PDF 手机字号优化 / 手绘概念海报双模板 / Codex 优先生图链路 / 5 张并发生成 / 商品拆解图同步 V2 / 提示词参数化模板固化） ✅ `c605835` — 验证: K1~K6 全部交付；E270 重生 5 张图，封面符合 cover_v2 要素、4 张内页符合 inner_v2 要素、配色属于同一色组；`poster_template.py` 模板参数化后同一期数据二次调用输出完全一致（幂等） [详情 →](roadmap/lark-knowledge-p3k-visual-v2.md)
