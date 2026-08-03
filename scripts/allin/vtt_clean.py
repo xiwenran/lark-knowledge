@@ -20,6 +20,9 @@ import argparse
 from pathlib import Path
 
 
+MAX_SENTENCE_WORDS = 1400
+
+
 def parse_timestamp(ts: str) -> float:
     """把 HH:MM:SS.mmm 转成秒数"""
     parts = ts.strip().split(":")
@@ -119,13 +122,21 @@ def parse_vtt(vtt_path: str) -> list[dict]:
 def merge_into_sentences(blocks: list[dict]) -> list[dict]:
     """
     把细碎的 block 合并成完整句子
-    遇到说话人切换或标点句尾时断开
+    遇到说话人切换、标点句尾或异常超长无标点时断开
     """
     sentences = []
     current_text = []
     current_start = None
     current_end = None
     current_speaker_change = False
+
+    def flush_current():
+        sentences.append({
+            'time_start': current_start,
+            'time_end': current_end,
+            'text': ' '.join(current_text),
+            'speaker_change': current_speaker_change
+        })
 
     for block in blocks:
         text = block['text']
@@ -136,12 +147,7 @@ def merge_into_sentences(blocks: list[dict]) -> list[dict]:
 
         # 说话人切换：保存当前句，开新句
         if block['speaker_change'] and current_text:
-            sentences.append({
-                'time_start': current_start,
-                'time_end': current_end,
-                'text': ' '.join(current_text),
-                'speaker_change': current_speaker_change
-            })
+            flush_current()
             current_text = []
             current_start = block['time_start']
             current_speaker_change = True
@@ -151,24 +157,22 @@ def merge_into_sentences(blocks: list[dict]) -> list[dict]:
 
         # 句子结尾标点时断开（但不在说话人切换处，已处理）
         if re.search(r'[.!?]\s*$', text) and len(current_text) >= 3:
-            sentences.append({
-                'time_start': current_start,
-                'time_end': current_end,
-                'text': ' '.join(current_text),
-                'speaker_change': current_speaker_change
-            })
+            flush_current()
+            current_text = []
+            current_start = None
+            current_speaker_change = False
+            continue
+
+        # YouTube 自动字幕可能整段无标点，避免单句无限累积撑爆翻译请求。
+        if len(' '.join(current_text).split()) > MAX_SENTENCE_WORDS:
+            flush_current()
             current_text = []
             current_start = None
             current_speaker_change = False
 
     # 剩余
     if current_text:
-        sentences.append({
-            'time_start': current_start,
-            'time_end': current_end,
-            'text': ' '.join(current_text),
-            'speaker_change': current_speaker_change
-        })
+        flush_current()
 
     return sentences
 
@@ -180,35 +184,32 @@ def group_into_segments(sentences: list[dict], segment_minutes: int = 15) -> lis
     current_sentences = []
     seg_start = None
 
+    def flush_segment():
+        seg_end = current_sentences[-1]['time_end']
+        segments.append({
+            'index': len(segments),
+            'time_start': seg_start,
+            'time_end': seg_end,
+            'time_label': f"{format_timestamp(seg_start)}–{format_timestamp(seg_end)}",
+            'sentences': current_sentences
+        })
+
     for sent in sentences:
         if seg_start is None:
             seg_start = sent['time_start']
 
         current_sentences.append(sent)
+        sent_word_count = len(sent['text'].split())
 
         # 到达分段时间且是句子结尾时切割
-        if sent['time_end'] - seg_start >= segment_seconds:
-            seg_end = sent['time_end']
-            segments.append({
-                'index': len(segments),
-                'time_start': seg_start,
-                'time_end': seg_end,
-                'time_label': f"{format_timestamp(seg_start)}–{format_timestamp(seg_end)}",
-                'sentences': current_sentences
-            })
+        if sent['time_end'] - seg_start >= segment_seconds or sent_word_count > MAX_SENTENCE_WORDS:
+            flush_segment()
             current_sentences = []
             seg_start = None
 
     # 剩余句子
     if current_sentences:
-        seg_end = current_sentences[-1]['time_end']
-        segments.append({
-            'index': len(segments),
-            'time_start': seg_start or 0,
-            'time_end': seg_end,
-            'time_label': f"{format_timestamp(seg_start or 0)}–{format_timestamp(seg_end)}",
-            'sentences': current_sentences
-        })
+        flush_segment()
 
     return segments
 

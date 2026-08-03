@@ -410,7 +410,9 @@ Codex 内置 gpt-image-2 图片生成能力，不消耗用户 API 额度。逐�
 保存路径：/tmp/sketchnote_<记录编号>_0N_<主题>.png
 ```
 
-通过 `codex:codex-rescue` 派发，每张图一个任务，带 `--write`。
+通过 echo-bridge 的 `desktop_intake_send` 派发（codex-rescue 插件已于 2026-07-27 停用），每张图一个任务，带 `--write`。
+
+若当前执行端本身就是 Codex，跳过派发直接生图或走 API fallback。
 
 **Fallback：Codex 失败时走 API**
 

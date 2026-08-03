@@ -93,13 +93,24 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 if [ -f "$VTT_FILE" ]; then
   echo "[Step 1/3] 字幕已存在，跳过下载"
 else
-  echo "[Step 1/3] 下载英文字幕..."
-  yt-dlp --write-auto-sub --sub-lang en --sub-format vtt --skip-download \
-    --output "$WORK_DIR/subtitles" "$YOUTUBE_URL"
-  mv "$WORK_DIR/subtitles.en.vtt" "$VTT_FILE" 2>/dev/null || \
-    mv "$WORK_DIR"/subtitles*.vtt "$VTT_FILE" 2>/dev/null || true
-  if [ ! -f "$VTT_FILE" ]; then
-    echo "❌ 字幕下载失败，请检查 YouTube URL 或手动提供 .vtt 文件"
+  echo "[Step 1/3] 下载英文字幕（多 client fallback）..."
+  set +e
+  SUB_OK=0
+  for CLIENT_ARG in "--extractor-args youtube:player_client=android" "" "--extractor-args youtube:player_client=ios" "--extractor-args youtube:player_client=tv" "--extractor-args youtube:player_client=web_safari"; do
+    for attempt in 1 2; do
+      rm -f "$WORK_DIR"/subtitles*.vtt 2>/dev/null
+      echo "   尝试 client=[${CLIENT_ARG:-default}] 第 $attempt 次..."
+      yt-dlp $CLIENT_ARG --write-auto-sub --sub-lang en --sub-format vtt --skip-download \
+        --output "$WORK_DIR/subtitles" "$YOUTUBE_URL" 2>&1 | tail -3
+      mv "$WORK_DIR/subtitles.en.vtt" "$VTT_FILE" 2>/dev/null || \
+        mv "$WORK_DIR"/subtitles*.vtt "$VTT_FILE" 2>/dev/null || true
+      if [ -f "$VTT_FILE" ]; then SUB_OK=1; break 2; fi
+      sleep 15
+    done
+  done
+  set -e
+  if [ "$SUB_OK" != "1" ]; then
+    echo "❌ 字幕下载失败（所有 client 均失败），请手动提供 .vtt 文件"
     exit 1
   fi
   echo "   ✅ 字幕已下载: $VTT_FILE"

@@ -144,16 +144,33 @@ def main():
     segments = json.loads(Path(args.input).read_text(encoding='utf-8'))
     print(f"       共 {len(segments)} 段")
 
-    # 断点续传：如果输出文件已存在，加载已翻译的段
+    # 断点续传：自动检测已有进度，或使用 --start-from 强制指定
     results = []
-    if args.start_from > 0 and Path(args.output).exists():
-        existing = json.loads(Path(args.output).read_text(encoding='utf-8'))
-        if len(existing) < args.start_from:
-            print(f"  ⚠️  警告：已有 {len(existing)} 段，但 --start-from={args.start_from}")
-            print(f"       调整为从第 {len(existing)} 段继续，避免数据空洞")
-            args.start_from = len(existing)
-        results = existing[:args.start_from]
-        print(f"[续传] 已加载前 {len(results)} 段")
+    output_path = Path(args.output)
+    if output_path.exists():
+        try:
+            existing = json.loads(output_path.read_text(encoding='utf-8'))
+            if isinstance(existing, list) and len(existing) > 0:
+                auto_start = len(existing)
+                if args.start_from > 0:
+                    # 显式指定 --start-from，用用户指定值（但不能超过已有段数）
+                    if args.start_from > auto_start:
+                        print(f"  ⚠️  警告：已有 {auto_start} 段，但 --start-from={args.start_from}")
+                        print(f"       调整为从第 {auto_start} 段继续，避免数据空洞")
+                        args.start_from = auto_start
+                else:
+                    # 默认自动续传：从已有段数继续
+                    if auto_start < len(segments):
+                        print(f"[自动续传] 检测到已有 {auto_start}/{len(segments)} 段，从第 {auto_start} 段继续")
+                        args.start_from = auto_start
+                    else:
+                        print(f"[跳过] 输出文件已包含全部 {auto_start} 段，无需重翻")
+                        print(f"       如需强制重翻，请删除 {args.output} 后再运行")
+                        return
+                results = existing[:args.start_from]
+                print(f"[续传] 已加载前 {len(results)} 段")
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"  ⚠️  读取已有输出文件失败（{e}），从头开始翻译")
 
     for i, segment in enumerate(segments):
         if i < args.start_from:

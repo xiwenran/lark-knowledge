@@ -49,7 +49,7 @@ lark-cli docs +fetch --doc "<url_or_token>" --format markdown
 
 三层降级路径：
 
-A. **Jina Reader（推荐，零配置无封号风险）**：用 WebFetch 请求 `https://r.jina.ai/` + 原始 URL，Jina 服务器端渲染后返回干净 Markdown，大多数公开文章可直接获取。
+A. **Jina Reader（推荐，零配置无封号风险）**：用 WebFetch 请求 `https://r.jina.ai/` + 原始 URL，Jina 服务器端渲染后返回干净 Markdown，大多数公开文章可直接获取（Claude 端用 WebFetch；Codex 端等价命令：`curl -sL "https://r.jina.ai/<原始URL>"`）。
 
 B. **扫码抓取（Jina 失败时）**：运行 `python -m fetchers.wechat --login`，在弹出浏览器里扫码一次。登录态保存到 `~/lark-knowledge/skills/lark-knowledge-intake/.local/wechat_cookie.json`（仅本机使用，不入仓）。cookie 过期时重跑 `--login`。
 
@@ -84,8 +84,8 @@ C. **手动兜底（以上均失败时）**：
 
 **其他网页 URL**：按三层降级处理：
 
-1. **WebFetch**（最快）→ 正文完整则直接用
-2. **Jina Reader**（WebFetch 正文不完整/乱码时）→ WebFetch 请求 `https://r.jina.ai/` + 原始 URL
+1. **WebFetch**（最快，仅 Claude 端；Codex 端直接从第 2 层 Jina 的 curl 方式开始）→ 正文完整则直接用
+2. **Jina Reader**（WebFetch 正文不完整/乱码时）→ WebFetch 请求 `https://r.jina.ai/` + 原始 URL（Claude 端用 WebFetch；Codex 端等价命令：`curl -sL "https://r.jina.ai/<原始URL>"`）
 3. **Playwright Stealth**（Jina 也失败时）→ 适用于有反爬保护的页面
 
 **洞察归档**（当前会话产生的总结/提炼结论）：
