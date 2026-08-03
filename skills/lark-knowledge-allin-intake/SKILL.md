@@ -36,6 +36,7 @@ YouTube URL → 抓取内容 → Worker（结构提取）→ Haiku（关键段�
 
 ```
 WebFetch: https://r.jina.ai/https://www.youtube.com/watch?v=<视频ID>
+（Claude 端用 WebFetch；Codex 端等价命令：`curl -sL "https://r.jina.ai/<页面URL>"`）
 ```
 
 Jina 返回的内容通常包含：视频标题、发布日期、描述、自动字幕（如有）。
@@ -59,7 +60,7 @@ grep -v "^[0-9]" /tmp/allin_<id>.en.vtt | grep -v "WEBVTT" | grep -v "^$" | grep
 
 ### 1C. 同步抓取 YouTube 元数据
 
-无论走 1A 还是 1B，同时用 WebFetch 抓取视频页面获取：
+无论走 1A 还是 1B，同时用 WebFetch 抓取视频页面获取（Claude 端用 WebFetch；Codex 端等价命令：`curl -sL "https://r.jina.ai/<页面URL>"`）：
 
 | 字段 | 提取位置 |
 |------|---------|

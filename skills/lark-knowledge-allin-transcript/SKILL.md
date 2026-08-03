@@ -17,6 +17,8 @@ metadata:
 
 # All In Podcast 逐字稿生成 v2.1
 
+> **执行端限定**：本 skill 仅限 Claude Code 执行（Step 3/4/5 的三级质量把关绑定 Claude Haiku / Sonnet / Opus 模型）。Codex 端收到触发词时不自行执行，转交 Claude Code 处理。
+
 **用户只需说一句话**，Claude Code 自动完成全部步骤：
 
 ```
@@ -351,7 +353,7 @@ python3 ~/lark-knowledge/scripts/allin/generate_sketchnote.py \
   --record-id "<record_id>" --prompts-only
 ```
 
-拿到每张图的提示词后，通过 `codex:codex-rescue` 逐张派发：
+拿到每张图的提示词后，通过 echo-bridge 的 `desktop_intake_send` 派发到 Codex 常驻接单任务（codex-rescue 插件已于 2026-07-27 停用）：
 ```
 目标：用 gpt-image-2 生成一张手绘笔记图片
 提示词：<该张图的完整提示词>
