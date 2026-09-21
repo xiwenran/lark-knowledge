@@ -209,11 +209,25 @@ def _build_markdown_from_xhs(data: dict, url: str) -> str:
     return "\n".join(lines).strip()
 
 
+_DISABLED_PLATFORMS = {"xhs"}  # 合规风险，禁用 Playwright cookie 抓取
+
+
 def fetch(url: str) -> FetchResult:
     """直接用 Playwright + 存储登录态抓取社交平台页面。"""
     normalized = url.strip()
     platform = _detect_platform(normalized)
     source_type = _detect_source_type(normalized)
+
+    if platform in _DISABLED_PLATFORMS:
+        return FetchResult(
+            markdown=None,
+            title=None,
+            meta={"platform": platform},
+            source_type=source_type,
+            url_or_path=normalized,
+            success=False,
+            error=f"{platform} Playwright 抓取已禁用（合规风险）。替代方式：手动复制内容粘贴给 AI，或通过浏览器扩展读取页面。",
+        )
 
     if platform == "unknown":
         return FetchResult(
@@ -322,6 +336,10 @@ def fetch(url: str) -> FetchResult:
 
 def login(platform: str) -> int:
     """打开浏览器让用户手动登录，保存 storage_state。"""
+    if platform in _DISABLED_PLATFORMS:
+        print(f"❌ {platform} Playwright 登录已禁用（合规风险）。")
+        return 1
+
     if platform not in PLATFORM_LOGIN_URLS:
         print(f"不支持的平台: {platform}。支持: {', '.join(PLATFORM_LOGIN_URLS.keys())}")
         return 1
